@@ -1,9 +1,8 @@
-// app/(tabs)/_layout.jsx
 import { Tabs } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useColorScheme } from "react-native";
 
-export default function TabLayout() {
+export default function TutorLayout() {
   const { colorScheme } = useColorScheme();
   const isDark = colorScheme === 'dark';
   
@@ -30,7 +29,7 @@ export default function TabLayout() {
       headerShown: false,
     }}>
       <Tabs.Screen
-        name="home"
+        name="tutor"
         options={{
           title: "Home",
           tabBarIcon: ({ color, size }) => (
