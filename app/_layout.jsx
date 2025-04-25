@@ -4,11 +4,28 @@ import { useColorScheme } from "nativewind";
 
 function RootLayoutNav() {
   const { colorScheme } = useColorScheme();
-  
+
   return (
-    <Stack>
-      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-      <Stack screenOptions={{ headerShown: false }} />
+    <Stack screenOptions={{ headerShown: false }}>
+      {/* Auth Group (Signin, Signup screens) */}
+      <Stack.Screen 
+        name="(auth)" 
+        options={{ 
+          headerShown: false,
+          // Prevent going back after logout
+          gestureEnabled: false 
+        }} 
+      />
+
+      {/* App Group (Protected screens including tabs) */}
+      <Stack.Screen 
+        name="(tabs)" 
+        options={{ 
+          headerShown: false,
+          // Prevent going back to auth screens
+          gestureEnabled: false 
+        }} 
+      />
     </Stack>
   );
 }

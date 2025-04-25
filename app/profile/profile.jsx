@@ -1,12 +1,88 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { View, Text, TextInput, TouchableOpacity, Image, StyleSheet } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import Icon from "react-native-vector-icons/Ionicons";
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function EditProfileScreen() {
-  const [image, setImage] = useState("https://via.placeholder.com/150");
+  const { userData } = useLocalSearchParams();
+  const userInfo = userData ? JSON.parse(userData) : null;
+  const [image, setImage] = useState("https://i.imgur.com/6VBx3io.png");
+  const [staffData, setStaffData] = useState(null);
   const router = useRouter();
+  
+  // Add the missing isLoading state
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchStaffData = async () => {
+      try {
+        setIsLoading(true);
+        const storedUserData = await AsyncStorage.getItem('userData');
+        
+        if (!storedUserData) {
+          console.error('No user data found in storage');
+          return;
+        }
+  
+        const parsedUserData = JSON.parse(storedUserData);
+        
+        // Since we already have the user data, let's use it directly
+        setStaffData({
+          staffName: parsedUserData.name,
+          email: parsedUserData.email,
+          phoneNumber: parsedUserData.phoneNo,
+          staffId: parsedUserData.staffId,
+          // Add any other fields you want to display
+        });
+  
+        // Set profile picture if available
+        if (parsedUserData.profilePicture) {
+          setImage(parsedUserData.profilePicture);
+        }
+  
+      } catch (error) {
+        console.error('Error setting staff data:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+  
+    fetchStaffData();
+  }, []);
+  
+  // Update handleSaveChanges to use the correct ID
+  const handleSaveChanges = async () => {
+    try {
+      const storedUserData = await AsyncStorage.getItem('userData');
+      const parsedUserData = JSON.parse(storedUserData);
+      
+      const response = await fetch(`http://10.0.2.2:5253/api/Staffs/${parsedUserData.staffId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          staffId: parsedUserData.staffId,
+          staffName: parsedUserData.name,
+          email: parsedUserData.email,
+          phoneNumber: parsedUserData.phoneNo,
+          profileImage: image,
+          // Add other required fields
+        })
+      });
+  
+      if (response.ok) {
+        console.log('Profile updated successfully');
+        router.back();
+      } else {
+        console.error('Failed to update profile');
+      }
+    } catch (error) {
+      console.error('Error updating profile:', error);
+    }
+  };
 
   const pickImage = async () => {
     let result = await ImagePicker.launchImageLibraryAsync({
@@ -21,10 +97,9 @@ export default function EditProfileScreen() {
     }
   };
 
-  const handleSaveChanges = () => {
-    // Perform save changes logic here
-    router.back(); // Navigate back to the previous screen
-  };
+  // Remove these duplicate declarations:
+  // const handleSaveChanges = async () => { ... };
+  // const handleSaveChanges = () => { router.back(); };
 
   return (
     <View style={styles.container}>
@@ -47,22 +122,42 @@ export default function EditProfileScreen() {
       <View style={styles.formSection}>
         <View style={styles.inputContainer}>
           <Icon name="person-outline" size={20} color="#007AFF" style={styles.icon} />
-          <TextInput style={styles.input} placeholder="Sonam Tenzin" value="Sonam Tenzin" />
+          <TextInput 
+            style={styles.input} 
+            placeholder="Name"
+            value={isLoading ? "Loading..." : (staffData?.staffName || "Not available")}
+            editable={false}
+          />
         </View>
 
         <View style={styles.inputContainer}>
           <Icon name="call-outline" size={20} color="#007AFF" style={styles.icon} />
-          <TextInput style={styles.input} placeholder="+975 | 17908548" value="+975 | 17908548" />
+          <TextInput 
+            style={styles.input} 
+            placeholder="Phone"
+            value={isLoading ? "Loading..." : (staffData?.phoneNumber || "Not available")}
+            editable={false}
+          />
         </View>
 
         <View style={styles.inputContainer}>
           <Icon name="mail-outline" size={20} color="#007AFF" style={styles.icon} />
-          <TextInput style={styles.input} placeholder="sonamtenzey0@gmail.com" value="sonamtenzey0@gmail.com" />
+          <TextInput 
+            style={styles.input} 
+            placeholder="Email"
+            value={isLoading ? "Loading..." : (staffData?.email || "Not available")}
+            editable={false}
+          />
         </View>
 
         <View style={styles.inputContainer}>
           <Icon name="location-outline" size={20} color="#007AFF" style={styles.icon} />
-          <TextInput style={styles.input} placeholder="Address" value="Rinchending, Phuentsholing" />
+          <TextInput 
+            style={styles.input} 
+            placeholder="Address"
+            value={isLoading ? "Loading..." : (staffData?.address || "Not available")}
+            editable={false}
+          />
         </View>
       </View>
 
@@ -73,6 +168,7 @@ export default function EditProfileScreen() {
   );
 }
 
+// Add this styles definition at the bottom of the file
 const styles = StyleSheet.create({
   container: {
     flex: 1,

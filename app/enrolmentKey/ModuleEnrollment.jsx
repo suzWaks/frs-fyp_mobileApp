@@ -1,20 +1,168 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, Platform, ToastAndroid } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { enrollModule } from '../api/enrollModule'; // Import the mock API
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+// Add API configuration
+const API_CONFIG = {
+  BASE_URL: Platform.select({
+    web: 'http://localhost:5253/api',
+    android: 'http://10.0.2.2:5253/api',
+    ios: 'http://localhost:5253/api',
+    default: 'http://localhost:5253/api'
+  }),
+  ENDPOINTS: {
+    CLASSES: '/Classes',
+    STUDENTS: '/Students'  // Added Students endpoint
+  }
+};
 
 const EnrollmentScreen = () => {
-  const { code, name, instructor } = useLocalSearchParams();
+  const { code, name, instructor, classId } = useLocalSearchParams();
   const [enrollmentKey, setEnrollmentKey] = useState('');
   const router = useRouter();
 
   const handleJoin = async () => {
-    const response = await enrollModule(enrollmentKey);
-    if (response.success) {
-      Alert.alert("Success", response.message);
-      router.push('/enrolmentKey/HomeWithModules'); // Navigate to HomeWithModules page
-    } else {
-      Alert.alert("Error", response.message);
+    try {
+      if (!enrollmentKey.trim()) {
+        if (Platform.OS === 'android') {
+          ToastAndroid.showWithGravity(
+            "Please enter an enrollment key",
+            ToastAndroid.LONG,
+            ToastAndroid.CENTER
+          );
+        } else {
+          Alert.alert("Error", "Please enter an enrollment key");
+        }
+        return;
+      }
+
+      // Get student data from AsyncStorage
+      const userData = await AsyncStorage.getItem('userData');
+      if (!userData) {
+        if (Platform.OS === 'android') {
+          ToastAndroid.showWithGravity(
+            "User data not found",
+            ToastAndroid.LONG,
+            ToastAndroid.CENTER
+          );
+        } else {
+          Alert.alert("Error", "User data not found");
+        }
+        return;
+      }
+
+      const student = JSON.parse(userData);
+      console.log('Student Data:', student); // Debug log
+
+      // First verify if entered key matches the module's enrollment key
+      if (enrollmentKey.trim() !== code.trim()) {
+        if (Platform.OS === 'android') {
+          ToastAndroid.showWithGravity(
+            "Invalid enrollment key",
+            ToastAndroid.LONG,
+            ToastAndroid.CENTER
+          );
+        } else {
+          Alert.alert("Error", "Invalid enrollment key");
+        }
+        return;
+      }
+
+      // Get existing ModuleIds or initialize empty array
+      const existingModuleIds = student.moduleIds || [];
+      
+      // Check if already enrolled
+      if (existingModuleIds.includes(parseInt(classId))) {
+        if (Platform.OS === 'android') {
+          ToastAndroid.showWithGravity(
+            "You are already enrolled in this module",
+            ToastAndroid.LONG,
+            ToastAndroid.CENTER
+          );
+        } else {
+          Alert.alert("Error", "You are already enrolled in this module");
+        }
+        return;
+      }
+
+      // Combine existing and new moduleIds
+      const updatedModuleIds = [...existingModuleIds, parseInt(classId)];
+
+      // Now PUT the class_Id into student's ModuleIds array
+      const updateResponse = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.STUDENTS}/${student.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            // Wrap in request object as required by API
+            id: student.id,
+            student_Id: student.studentId ? parseInt(student.studentId) : 0, // Ensure it's a number
+            google_Id: student.google_Id,
+            name: student.name,
+            email: student.email,
+            year: student.year || "1",
+            phone_No: parseInt(student.phone_No) || 0,
+            profile_PictureURL: student.profile_PictureURL || "",
+            role_Id: 5, // Changed to 5 for STUDENT role
+            department_Id: parseInt(student.department_Id) || 1,
+            moduleIds: updatedModuleIds  // Use camelCase to match backend
+          
+        })
+      });
+
+      // Remove the duplicate debug logs since they're not needed anymore
+
+      if (updateResponse.ok) {
+        // Update the local storage with new moduleIds
+        const updatedUserData = {
+          ...student,
+          moduleIds: updatedModuleIds
+        };
+        await AsyncStorage.setItem('userData', JSON.stringify(updatedUserData));
+
+        console.log('Enrollment successful'); // Debug log
+        if (Platform.OS === 'android') {
+          ToastAndroid.showWithGravity(
+            `Successfully enrolled in ${name}!`,
+            ToastAndroid.LONG,
+            ToastAndroid.CENTER
+          );
+        } else {
+          Alert.alert('Success', `Successfully enrolled in ${name}!`);
+        }
+        
+        // Add a small delay before navigation to ensure toast is visible
+        setTimeout(() => {
+          router.replace({
+            pathname: '/(students)/student',
+            params: { refresh: true }
+          });
+        }, 2000);
+      } else {
+        console.log('Enrollment failed:', await updateResponse.text()); // Debug log
+        if (Platform.OS === 'android') {
+          ToastAndroid.showWithGravity(
+            "Failed to enroll. Please try again.",
+            ToastAndroid.LONG,
+            ToastAndroid.CENTER
+          );
+        } else {
+          Alert.alert("Error", "Failed to enroll. Please try again.");
+        }
+      }
+    } catch (error) {
+      console.error('Enrollment error:', error); // Debug log
+      if (Platform.OS === 'android') {
+        ToastAndroid.showWithGravity(
+          "An error occurred. Please try again.",
+          ToastAndroid.LONG,
+          ToastAndroid.CENTER
+        );
+      } else {
+        Alert.alert("Error", "An error occurred. Please try again.");
+      }
     }
   };
 

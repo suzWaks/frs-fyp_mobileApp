@@ -1,7 +1,8 @@
-import { View, Text, TouchableOpacity, StyleSheet, FlatList, Image, Pressable, Modal } from 'react-native';
+import { View, Text, TouchableOpacity, FlatList, Image, Pressable, Modal } from 'react-native';
 import React, { useState } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useColorScheme } from 'nativewind';
 
 const students = [
   { id: '1', name: 'Esther Howard', image: 'https://via.placeholder.com/40' },
@@ -17,11 +18,25 @@ const students = [
 export default function StudentListScreen() {
   const { year } = useLocalSearchParams();
   const router = useRouter();
+  const { colorScheme, setColorScheme } = useColorScheme();
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState(null);
 
+  // Dark mode state and colors
+  const isDarkMode = colorScheme === 'dark';
+  const textColor = isDarkMode ? '#a9b1d6' : '#000';
+  const backgroundColor = isDarkMode ? '#1a1b26' : '#fff';
+  const headerBg = isDarkMode ? '#24283b' : '#F0F0FF';
+  const cardBg = isDarkMode ? '#24283b' : '#fff';
+  const borderColor = isDarkMode ? '#3b3b3b' : '#e5e5e5';
+
+  const toggleMode = () => {
+    const newMode = isDarkMode ? 'light' : 'dark';
+    setColorScheme(newMode);
+  };
+
   const handleEditPress = () => {
-    router.push('/profile/profile'); // Navigate to the profile screen
+    router.push('/profile/profile');
   };
 
   const handleDeletePress = (student) => {
@@ -35,48 +50,61 @@ export default function StudentListScreen() {
   };
 
   const handleDelete = () => {
-    // Perform delete action here
     setIsModalVisible(false);
     setSelectedStudent(null);
+    // Add your actual delete logic here
   };
 
-  const handleDonePress = () => {
-    router.back(); // Navigate back to the previous screen
+  const handleBackPress = () => {
+    router.back();
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor }]}>
       {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>4IT Students</Text>
-        <Ionicons name="ellipsis-vertical" size={24} color="#000" />
-      </View>
+      <View style={[styles.header, { backgroundColor: headerBg }]}>
+        {/* Left Side: Back Button */}
+        <View style={styles.leftHeader}>
+          <TouchableOpacity onPress={handleBackPress} style={styles.backButton}>
+            <Ionicons name="arrow-back" size={24} color={textColor} />
+          </TouchableOpacity>
+          <Text style={[styles.title, { color: textColor }]}>4IT Students</Text>
+        </View>
 
+        {/* Right Side: Mode Toggle */}
+        <View style={styles.headerRight}>
+          <TouchableOpacity onPress={toggleMode}>
+            <Ionicons 
+              name={isDarkMode ? "sunny-outline" : "moon-outline"} 
+              size={24} 
+              color={textColor} 
+            />
+          </TouchableOpacity>
+        </View>
+      </View>
+      
       {/* Members List */}
-      <Text style={styles.membersListLabel}>Members List</Text>
+      <Text style={[styles.sectionTitle, { color: textColor }]}>Members List</Text>
       <FlatList
         data={students}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
-          <View style={styles.studentCard}>
+          <View style={[styles.studentCard, { 
+            backgroundColor: cardBg,
+            borderColor: borderColor 
+          }]}>
             <Image source={{ uri: item.image }} style={styles.studentImage} />
-            <Text style={styles.studentName}>{item.name}</Text>
-            <View style={styles.actions}>
+            <Text style={[styles.studentName, { color: textColor }]}>{item.name}</Text>
+            <View style={styles.actionsContainer}>
               <Pressable
                 onPress={() => handleDeletePress(item)}
-                style={({ pressed }) => [
-                  styles.actionButton,
-                  pressed && styles.deleteButtonPressed,
-                ]}
+                style={[styles.actionButton, { backgroundColor: isDarkMode ? '#3b3b3b' : '#f0f0f0' }]}
               >
                 <Ionicons name="close" size={20} color="#FF6B6B" />
               </Pressable>
               <Pressable
                 onPress={handleEditPress}
-                style={({ pressed }) => [
-                  styles.actionButton,
-                  pressed && styles.editButtonPressed,
-                ]}
+                style={[styles.actionButton, { backgroundColor: isDarkMode ? '#3b3b3b' : '#f0f0f0' }]}
               >
                 <Ionicons name="create-outline" size={20} color="#6B4EFF" />
               </Pressable>
@@ -85,35 +113,28 @@ export default function StudentListScreen() {
         )}
       />
 
-      {/* Done Button */}
-      <TouchableOpacity style={styles.doneButton} onPress={handleDonePress}>
-        <Text style={styles.doneButtonText}>Done</Text>
-      </TouchableOpacity>
-
       {/* Delete Confirmation Modal */}
-      <Modal
-        visible={isModalVisible}
-        transparent={true}
-        animationType="slide"
-      >
-        <View style={styles.modalContainer}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Are you sure you want to delete the student?</Text>
-            <Text style={styles.modalMessage}>
+      <Modal visible={isModalVisible} transparent={true} animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: cardBg }]}>
+            <Text style={[styles.modalTitle, { color: textColor }]}>
+              Are you sure you want to delete the student?
+            </Text>
+            <Text style={styles.warningText}>
               **Caution!! This will delete all the records related to this student
             </Text>
-            <View style={styles.modalActions}>
+            <View style={styles.modalButtons}>
               <TouchableOpacity
-                style={styles.cancelButton}
+                style={[styles.modalButton, styles.cancelButton, { backgroundColor: isDarkMode ? '#3b3b3b' : '#f0f0f0' }]}
                 onPress={handleCancel}
               >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
+                <Text style={[styles.buttonText, { color: textColor }]}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={styles.deleteButton}
+                style={[styles.modalButton, styles.deleteButton]}
                 onPress={handleDelete}
               >
-                <Text style={styles.deleteButtonText}>Delete</Text>
+                <Text style={styles.buttonText}>Delete</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -123,23 +144,35 @@ export default function StudentListScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = {
   container: {
     flex: 1,
     padding: 20,
-    backgroundColor: '#fff',
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    padding: 15,
+    borderRadius: 10,
     marginBottom: 20,
   },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: '600',
+  leftHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
-  membersListLabel: {
+  backButton: {
+    marginRight: 15,
+  },
+  title: {
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  sectionTitle: {
     fontSize: 16,
     fontWeight: '600',
     marginBottom: 10,
@@ -147,92 +180,72 @@ const styles = StyleSheet.create({
   studentCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    padding: 15,
+    borderRadius: 10,
+    marginBottom: 10,
+    borderWidth: 1,
   },
   studentImage: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    marginRight: 10,
+    marginRight: 15,
   },
   studentName: {
     flex: 1,
     fontSize: 16,
   },
-  actions: {
+  actionsContainer: {
     flexDirection: 'row',
   },
   actionButton: {
+    padding: 8,
+    borderRadius: 20,
     marginLeft: 10,
-    padding: 5,
-    borderRadius: 5,
-    backgroundColor: '#f0f0f0',
   },
-  deleteButtonPressed: {
-    backgroundColor: '#FFEBEB',
-  },
-  editButtonPressed: {
-    backgroundColor: '#EDEBFF',
-  },
-  doneButton: {
-    backgroundColor: '#6B4EFF',
-    padding: 15,
-    borderRadius: 10,
-    alignItems: 'center',
-    marginTop: 20,
-  },
-  doneButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '500',
-  },
-  modalContainer: {
+  modalOverlay: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0,0,0,0.5)',
   },
   modalContent: {
-    width: 300,
+    width: '80%',
     padding: 20,
-    backgroundColor: '#fff',
     borderRadius: 10,
     alignItems: 'center',
   },
   modalTitle: {
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: 'bold',
     marginBottom: 10,
     textAlign: 'center',
   },
-  modalMessage: {
-    fontSize: 16,
-    marginBottom: 20,
+  warningText: {
+    fontSize: 14,
+    color: '#FF6B6B',
     textAlign: 'center',
-    color: 'red',
+    marginBottom: 20,
   },
-  modalActions: {
+  modalButtons: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '100%',
   },
-  cancelButton: {
-    backgroundColor: '#f0f0f0',
+  modalButton: {
     padding: 10,
     borderRadius: 5,
-    marginRight: 10,
+    width: '48%',
+    alignItems: 'center',
   },
-  cancelButtonText: {
-    fontSize: 16,
-    color: '#000',
+  cancelButton: {
+    marginRight: 10,
   },
   deleteButton: {
     backgroundColor: '#FF6B6B',
-    padding: 10,
-    borderRadius: 5,
   },
-  deleteButtonText: {
-    fontSize: 16,
-    color: '#fff',
+  buttonText: {
+    color: 'white',
+    fontWeight: 'bold',
   },
-});
+};
