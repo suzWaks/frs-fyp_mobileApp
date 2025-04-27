@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
-import Icon from 'react-native-vector-icons/Ionicons'; // Import Ionicons
+import Icon from 'react-native-vector-icons/Ionicons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useColorScheme } from 'nativewind';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import AttendanceDialog from '../tutorcomponent/attendanceDialog'; // Import the AttendanceDialog component
+import AttendanceDialog from '../tutorcomponent/attendanceDialog';
 
 const ModuleReport = () => {
   const { code, name, instructor } = useLocalSearchParams();
@@ -16,19 +16,17 @@ const ModuleReport = () => {
     { date: '7/5/2024', time: '10-12 am', attendance: 'Present' },
   ];
 
-  // State to track which button is pressed
   const [activeButton, setActiveButton] = useState(null);
   const [isDialogVisible, setIsDialogVisible] = useState(false);
   const [userRole, setUserRole] = useState(null);
-  const [userName, setUserName] = useState(''); // State to store user name
+  const [userName, setUserName] = useState('');
   const { colorScheme, toggleColorScheme } = useColorScheme();
   const router = useRouter();
 
-  // Fetch user role and name from AsyncStorage
   useEffect(() => {
     const getUserDetails = async () => {
       const role = await AsyncStorage.getItem('userRole');
-      const name = await AsyncStorage.getItem('userName'); // Assuming userName is stored in AsyncStorage
+      const name = await AsyncStorage.getItem('userName');
       setUserRole(role);
       setUserName(name);
     };
@@ -40,19 +38,24 @@ const ModuleReport = () => {
   };
 
   const handleBackPress = () => {
-    router.replace('/enrolmentKey/HomeWithModules'); // Ensure navigation to HomeWithModules page
+    router.replace('/student');
   };
 
   return (
     <View style={[styles.container, { backgroundColor: colorScheme === "dark" ? "#1a1b26" : "#fff" }]}>
       {/* Header Section */}
       <View style={[styles.header, { backgroundColor: colorScheme === "dark" ? "#1a1b26" : "#fff" }]}>
-        <TouchableOpacity onPress={() => router.push('/profile/profile')} style={styles.profileSection}>
-          <Icon name="person-circle-outline" size={40} color={colorScheme === "dark" ? "white" : "black"} />
-          <Text style={[styles.greeting, { color: colorScheme === "dark" ? "white" : "black" }]}>
-            Hello, {userName}
-          </Text>
-        </TouchableOpacity>
+        <View style={styles.headerLeft}>
+          <TouchableOpacity onPress={handleBackPress} style={styles.backButton}>
+            <Icon name="arrow-back" size={24} color={colorScheme === "dark" ? "white" : "black"} />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => router.push('/profile/profile')} style={styles.profileSection}>
+            <Icon name="person-circle-outline" size={40} color={colorScheme === "dark" ? "white" : "black"} />
+            <Text style={[styles.greeting, { color: colorScheme === "dark" ? "white" : "black" }]}>
+              Hello, {userName}
+            </Text>
+          </TouchableOpacity>
+        </View>
         <View style={styles.headerRight}>
           <TouchableOpacity onPress={() => alert("Notifications pressed")} style={styles.notificationIcon}>
             <Icon
@@ -160,7 +163,7 @@ const ModuleReport = () => {
       <AttendanceDialog
         visible={isDialogVisible}
         onClose={() => setIsDialogVisible(false)}
-        userRole={userRole} // Pass userRole to the dialog
+        userRole={userRole}
       />
     </View>
   );
@@ -178,6 +181,13 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 20,
   },
+  headerLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  backButton: {
+    marginRight: 12,
+  },
   profileSection: {
     flexDirection: "row",
     alignItems: "center",
@@ -192,10 +202,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   notificationIcon: {
-    marginRight: 8, // Adjusted margin
+    marginRight: 16,
   },
   modeIcon: {
-    marginLeft: 8, // Adjusted margin
+    marginLeft: 16,
   },
   moduleInfo: {
     padding: 16,

@@ -7,7 +7,7 @@ export default function TutorLayout() {
   const isDark = colorScheme === 'dark';
   
   // Define colors based on theme
-  const activeColor = isDark ? "#7aa2f7" : "#2ac3de";
+  const activeColor = "#7647EB"; // Using your specified primary color
   const inactiveColor = isDark ? "#a9b1d6" : "#11181C";
   const backgroundColor = isDark ? "#1a1b26" : "#FFFFFF";
   const borderColor = isDark ? "#2c2e3f" : "#e0e0e0";
@@ -22,6 +22,13 @@ export default function TutorLayout() {
       },
       tabBarActiveTintColor: activeColor,
       tabBarInactiveTintColor: inactiveColor,
+      tabBarLabelStyle: {
+        fontSize: 12,
+        marginBottom: 8,
+      },
+      tabBarIconStyle: {
+        marginTop: 8,
+      },
       headerStyle: {
         backgroundColor: backgroundColor,
       },
@@ -32,8 +39,12 @@ export default function TutorLayout() {
         name="tutor"
         options={{
           title: "Home",
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="home" size={size} color={color} />
+          tabBarIcon: ({ color, size, focused }) => (
+            <Ionicons 
+              name={focused ? "home" : "home-outline"} 
+              size={size} 
+              color={focused ? activeColor : color} 
+            />
           ),
         }}
       />
@@ -41,17 +52,25 @@ export default function TutorLayout() {
         name="modules"
         options={{
           title: "Modules",
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="library" size={size} color={color} />
+          tabBarIcon: ({ color, size, focused }) => (
+            <Ionicons 
+              name={focused ? "library" : "library-outline"} 
+              size={size} 
+              color={focused ? activeColor : color} 
+            />
           ),
         }}
       />
       <Tabs.Screen
-        name="settings"
+        name="menu"
         options={{
-          title: "Settings",
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="settings-outline" size={size} color={color} />
+          title: "Menu",
+          tabBarIcon: ({ color, size, focused }) => (
+            <Ionicons 
+              name={focused ? "menu" : "menu-outline"} 
+              size={size} 
+              color={focused ? activeColor : color} 
+            />
           ),
         }}
       />

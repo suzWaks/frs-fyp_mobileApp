@@ -50,13 +50,13 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="settings"
+        name="menu"
         options={{
-          title: "Settings",
-          headerTitleAlign: "left",
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="settings-outline" size={size} color={color} />
-          ),
+          title: "Menu",
+          tabBarIcon: ({ color, size }) => {
+            console.log("Rendering Menu Icon");
+            return <Ionicons name="menu-outline" size={size} color={color} /> // Hamburger icon
+          },
         }}
       />
     </Tabs>
