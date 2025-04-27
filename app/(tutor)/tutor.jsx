@@ -1,29 +1,35 @@
-import { View, Text, ScrollView, TouchableOpacity, Animated, TouchableWithoutFeedback, StyleSheet, Switch } from "react-native";
+import { View, Text, ScrollView, TouchableOpacity, Animated, TouchableWithoutFeedback, StyleSheet, Switch, Image } from "react-native";
 import { useColorScheme } from "nativewind";
 import { useState, useEffect } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router"; 
-import AttendanceDialog from "../tutorcomponent/attendanceDialog"; 
+import AttendanceDialog from "../tutorcomponent/attendanceDialog.jsx";
 import AsyncStorage from "@react-native-async-storage/async-storage"; 
+import Constants from "expo-constants";
 
 export default function HeaderScreen() {
   const router = useRouter(); 
   const { colorScheme, toggleColorScheme } = useColorScheme();
   const [modalVisible, setModalVisible] = useState(false);
   const [isTutorMode, setIsTutorMode] = useState(true); 
+  const [userRole, setUserRole] = useState(null);
+  const [staffData, setStaffData] = useState(null);
+  const [selectedClassId, setSelectedClassId] = useState(null);
+  
+  const API_BASE_URL = Constants.expoConfig.extra.API_BASE_URL;
   const primaryColor = '#7647EB';
   const lightPrimary = '#9D71EE';
   const lightestPrimary = '#CDABFF';
-  const [userRole, setUserRole] = useState(null);
 
-  // Header icon/text colors - Moved here after colorScheme is defined
+  // Header icon/text colors
   const headerIconColor = colorScheme === 'dark' ? '#E0E0E0' : '#000';
   const headerTextColor = colorScheme === 'dark' ? '#E0E0E0' : '#000';
 
-  // Update useEffect to check user role
+  // Fetch user data and staff data
   useEffect(() => {
     const loadUserData = async () => {
       try {
+        // Load user role from AsyncStorage
         const userData = await AsyncStorage.getItem('userData');
         if (userData) {
           const { role } = JSON.parse(userData);
@@ -33,8 +39,19 @@ export default function HeaderScreen() {
         if (storedRole) {
           setIsTutorMode(storedRole === "tutor");
         }
+
+        // Fetch staff data from API
+        const response = await fetch(`${API_BASE_URL}/Staffs`);
+        const data = await response.json();
+        const staffId = 1; // You might want to get this from user data
+        const staff = data.find((staff) => staff.staff_Id === staffId);
+        if (staff) {
+          setStaffData(staff);
+        } else {
+          console.error(`Staff with ID ${staffId} not found`);
+        }
       } catch (error) {
-        console.error('Error loading user data:', error);
+        console.error('Error loading data:', error);
       }
     };
     loadUserData();
@@ -54,7 +71,6 @@ export default function HeaderScreen() {
   
   const [recentViewOptionsVisible, setRecentViewOptionsVisible] = useState(null);
   const [allModulesViewOptionsVisible, setAllModulesViewOptionsVisible] = useState(null);
-
   const [dropdownAnimation] = useState(new Animated.Value(0));
 
   const toggleDropdown = (index, type) => {
@@ -92,11 +108,11 @@ export default function HeaderScreen() {
     setAllModulesViewOptionsVisible(null);
   };
 
-  const handleViewPress = (moduleCode, viewType) => {
+  const handleViewPress = (moduleCode, viewType, class_Id) => {
     const route = viewType === "attendance" ? "/tutorcomponent/attendanceReport" : "/tutorcomponent/moduleDetail";
     router.push({
       pathname: route,
-      params: { moduleCode: moduleCode },
+      params: { moduleCode: moduleCode, class_Id: class_Id },
     });
   };
 
@@ -108,22 +124,39 @@ export default function HeaderScreen() {
     router.push("/profile/profile"); 
   };
 
+  const handleTakeAttendancePress = (class_Id) => {
+    setSelectedClassId(class_Id);
+    setModalVisible(true);
+    console.log("Passed class id: ", class_Id);
+  };
+
+  if (!staffData) {
+    return <Text>Loading...</Text>;
+  }
+
   return (
     <TouchableWithoutFeedback onPress={handleOutsideClick}>
       <View style={[styles.container, { backgroundColor: colorScheme === "dark" ? "#121212" : "#fff" }]}>
 
-        <AttendanceDialog visible={modalVisible} onClose={() => setModalVisible(false)} />
+        <AttendanceDialog visible={modalVisible} onClose={() => setModalVisible(false)} class_Id={selectedClassId} />
 
         <View style={[styles.header, { backgroundColor: colorScheme === "dark" ? "#1E1E1E" : "#fff" }]}>
 
           <TouchableOpacity onPress={handleProfileIconPress} style={styles.profileSection}>
-            <Ionicons 
-              name="person-circle-outline" 
-              size={40} 
-              color={headerIconColor} 
-            />
+            {staffData.profileImage ? (
+              <Image
+                source={{ uri: staffData.profileImage }}
+                style={styles.profileImage}
+              />
+            ) : (
+              <Ionicons 
+                name="person-circle-outline" 
+                size={40} 
+                color={headerIconColor} 
+              />
+            )}
             <Text style={[styles.profileText, { color: headerTextColor }]}>
-              Hello, Ms. Dechen
+              {staffData.name}
             </Text>
           </TouchableOpacity>
 
@@ -169,74 +202,15 @@ export default function HeaderScreen() {
           <Text style={[styles.sectionTitle, { color: primaryColor }]}>Recent</Text>
           <View style={[styles.cardContainer, { backgroundColor: colorScheme === "dark" ? "#1E1E1E" : "#fff" }]}>
             <ScrollView horizontal showsHorizontalScrollIndicator={true} style={{ borderRadius: 10 }}>
-              {[{ code: "CTE411", name: "Artificial Intelligence" }, { code: "DIS404", name: "Management Information System" }, { code: "MAT402", name: "Optimization Techniques" }].map(
-                (module, index) => (
-                  <View key={index} style={[styles.moduleCard, { backgroundColor: colorScheme === "dark" ? "#2D2D2D" : "#fff" }]}>
-                    <View style={[styles.moduleHeader, { backgroundColor: primaryColor }]}>
-                      <View>
-                        <Text style={[styles.moduleCode, { color: '#fff' }]}>{module.code}</Text>
-                        <Text style={[styles.moduleName, { color: 'rgba(255,255,255,0.8)' }]}>{module.name}</Text>
-                      </View>
-                      <TouchableOpacity 
-                        onPress={() => toggleDropdown(index, 'recent')}
-                        style={[styles.viewButton, { backgroundColor: lightPrimary }]}
-                      >
-                        <Text style={styles.viewButtonText}>View</Text>
-                      </TouchableOpacity>
-                    </View>
-
-                    {/* Take Attendance Button */}
-                    <View style={styles.attendanceButtonContainer}>
-                      <TouchableOpacity 
-                        onPress={() => setModalVisible(true)} 
-                        style={[styles.attendanceButton, { backgroundColor: primaryColor }]}
-                      >
-                        <Text style={styles.attendanceButtonText}>Take Attendance</Text>
-                      </TouchableOpacity>
-                    </View>
-
-                    {/* Dropdown Options for Recent */}
-                    {recentViewOptionsVisible === index && (
-                      <Animated.View
-                        style={[styles.dropdownMenu, { 
-                          backgroundColor: lightPrimary,
-                          opacity: dropdownOpacity,
-                          transform: [{ translateY: dropdownTranslateY }],
-                        }]}
-                      >
-                        <TouchableOpacity 
-                          style={styles.dropdownItem}
-                          onPress={() => handleViewPress(module.code, 'attendance')}
-                        >
-                          <Text style={[styles.dropdownItemText, { color: '#fff' }]}>Attendance Report</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity 
-                          style={styles.dropdownItem}
-                          onPress={() => handleViewPress(module.code, 'moduleDetail')}
-                        >
-                          <Text style={[styles.dropdownItemText, { color: '#fff' }]}>Module Detail</Text>
-                        </TouchableOpacity>
-                      </Animated.View>
-                    )}
-                  </View>
-                )
-              )}
-            </ScrollView>
-          </View>
-
-          {/* All Modules */}
-          <Text style={[styles.sectionTitle, { color: primaryColor }]}>All Modules</Text>
-          <ScrollView style={styles.verticalScroll}>
-            {[{ code: "CTE411", name: "Artificial Intelligence" }, { code: "DIS404", name: "Management Information System" }, { code: "MAT402", name: "Optimization Techniques" }].map(
-              (module, index) => (
-                <View key={index} style={[styles.moduleCardVertical, { backgroundColor: colorScheme === "dark" ? "#2D2D2D" : "#fff" }]}>
+              {staffData.classes.map((module, index) => (
+                <View key={index} style={[styles.moduleCard, { backgroundColor: colorScheme === "dark" ? "#2D2D2D" : "#fff" }]}>
                   <View style={[styles.moduleHeader, { backgroundColor: primaryColor }]}>
                     <View>
-                      <Text style={[styles.moduleCode, { color: '#fff' }]}>{module.code}</Text>
-                      <Text style={[styles.moduleName, { color: 'rgba(255,255,255,0.8)' }]}>{module.name}</Text>
+                      <Text style={[styles.moduleCode, { color: '#fff' }]}>{module.module_Code}</Text>
+                      <Text style={[styles.moduleName, { color: 'rgba(255,255,255,0.8)' }]}>{module.class_Name}</Text>
                     </View>
                     <TouchableOpacity 
-                      onPress={() => toggleDropdown(index, 'allModules')}
+                      onPress={() => toggleDropdown(index, 'recent')}
                       style={[styles.viewButton, { backgroundColor: lightPrimary }]}
                     >
                       <Text style={styles.viewButtonText}>View</Text>
@@ -246,17 +220,17 @@ export default function HeaderScreen() {
                   {/* Take Attendance Button */}
                   <View style={styles.attendanceButtonContainer}>
                     <TouchableOpacity 
-                      onPress={() => setModalVisible(true)} 
+                      onPress={() => handleTakeAttendancePress(module.class_Id)} 
                       style={[styles.attendanceButton, { backgroundColor: primaryColor }]}
                     >
                       <Text style={styles.attendanceButtonText}>Take Attendance</Text>
                     </TouchableOpacity>
                   </View>
 
-                  {/* Dropdown Options for All Modules */}
-                  {allModulesViewOptionsVisible === index && (
+                  {/* Dropdown Options for Recent */}
+                  {recentViewOptionsVisible === index && (
                     <Animated.View
-                      style={[styles.dropdownMenuVertical, { 
+                      style={[styles.dropdownMenu, { 
                         backgroundColor: lightPrimary,
                         opacity: dropdownOpacity,
                         transform: [{ translateY: dropdownTranslateY }],
@@ -264,21 +238,76 @@ export default function HeaderScreen() {
                     >
                       <TouchableOpacity 
                         style={styles.dropdownItem}
-                        onPress={() => handleViewPress(module.code, 'attendance')}
+                        onPress={() => handleViewPress(module.module_Code, 'attendance', module.class_Id)}
                       >
                         <Text style={[styles.dropdownItemText, { color: '#fff' }]}>Attendance Report</Text>
                       </TouchableOpacity>
                       <TouchableOpacity 
                         style={styles.dropdownItem}
-                        onPress={() => handleViewPress(module.code, 'moduleDetail')}
+                        onPress={() => handleViewPress(module.module_Code, 'moduleDetail', module.class_Id)}
                       >
                         <Text style={[styles.dropdownItemText, { color: '#fff' }]}>Module Detail</Text>
                       </TouchableOpacity>
                     </Animated.View>
                   )}
                 </View>
-              )
-            )}
+              ))}
+            </ScrollView>
+          </View>
+
+          {/* All Modules */}
+          <Text style={[styles.sectionTitle, { color: primaryColor }]}>All Modules</Text>
+          <ScrollView style={styles.verticalScroll}>
+            {staffData.classes.map((module, index) => (
+              <View key={index} style={[styles.moduleCardVertical, { backgroundColor: colorScheme === "dark" ? "#2D2D2D" : "#fff" }]}>
+                <View style={[styles.moduleHeader, { backgroundColor: primaryColor }]}>
+                  <View>
+                    <Text style={[styles.moduleCode, { color: '#fff' }]}>{module.module_Code}</Text>
+                    <Text style={[styles.moduleName, { color: 'rgba(255,255,255,0.8)' }]}>{module.class_Name}</Text>
+                  </View>
+                  <TouchableOpacity 
+                    onPress={() => toggleDropdown(index, 'allModules')}
+                    style={[styles.viewButton, { backgroundColor: lightPrimary }]}
+                  >
+                    <Text style={styles.viewButtonText}>View</Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Take Attendance Button */}
+                <View style={styles.attendanceButtonContainer}>
+                  <TouchableOpacity 
+                    onPress={() => handleTakeAttendancePress(module.class_Id)} 
+                    style={[styles.attendanceButton, { backgroundColor: primaryColor }]}
+                  >
+                    <Text style={styles.attendanceButtonText}>Take Attendance</Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Dropdown Options for All Modules */}
+                {allModulesViewOptionsVisible === index && (
+                  <Animated.View
+                    style={[styles.dropdownMenuVertical, { 
+                      backgroundColor: lightPrimary,
+                      opacity: dropdownOpacity,
+                      transform: [{ translateY: dropdownTranslateY }],
+                    }]}
+                  >
+                    <TouchableOpacity 
+                      style={styles.dropdownItem}
+                      onPress={() => handleViewPress(module.module_Code, 'attendance', module.class_Id)}
+                    >
+                      <Text style={[styles.dropdownItemText, { color: '#fff' }]}>Attendance Report</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity 
+                      style={styles.dropdownItem}
+                      onPress={() => handleViewPress(module.module_Code, 'moduleDetail', module.class_Id)}
+                    >
+                      <Text style={[styles.dropdownItemText, { color: '#fff' }]}>Module Detail</Text>
+                    </TouchableOpacity>
+                  </Animated.View>
+                )}
+              </View>
+            ))}
           </ScrollView>
         </View>
       </View>
@@ -441,5 +470,10 @@ const styles = StyleSheet.create({
   },
   verticalScroll: {
     marginBottom: 16,
+  },
+  profileImage: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
   },
 });

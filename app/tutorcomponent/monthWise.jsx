@@ -1,214 +1,221 @@
-import React, { Component } from 'react';
-import { StyleSheet, View, ScrollView, Text, TouchableOpacity, Alert } from 'react-native';
-import { Table, Row } from 'react-native-table-component';
-import Icon from 'react-native-vector-icons/MaterialIcons'; // Icon for download
-import { Share } from 'react-native';
-import RNPickerSelect from 'react-native-picker-select'; // Import RNPickerSelect
+import { View, Text, TouchableOpacity, FlatList, Alert } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { Ionicons } from '@expo/vector-icons';
+import * as FileSystem from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
+import { useColorScheme } from 'nativewind';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import Constants from 'expo-constants';
 
-export default class MonthWiseReport extends Component {
-  constructor(props) {
-    super(props);
-    this.state = {
-      tableHead: ['Student ID', 'Student Name', 'Present', 'Absent'],
-      widthArr: [100, 150, 80, 80],
-      selectedMonth: 'June', // Set default selected month to 'June'
+export default function MonthWiseReport() {
+  const { class_Id } = useLocalSearchParams();
+  const router = useRouter();
+  const allMonths = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  const currentMonth = new Date().toLocaleString('default', { month: 'long' });
+  const { colorScheme } = useColorScheme();
+  const API_BASE_URL = Constants.expoConfig.extra.API_BASE_URL;
+
+  const [showMonthDropdown, setShowMonthDropdown] = useState(false);
+  const [selectedMonth, setSelectedMonth] = useState(currentMonth);
+  const [filteredData, setFilteredData] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [availableMonths, setAvailableMonths] = useState([]);
+
+  useEffect(() => {
+    const fetchAttendanceData = async () => {
+      try {
+        setLoading(true);
+        
+        // First fetch all attendance records to determine available months
+        const response = await fetch(`${API_BASE_URL}/AttendanceRecords/class/${class_Id}`);
+        if (!response.ok) throw new Error("Failed to fetch attendance data");
+        
+        const attendanceData = await response.json();
+        
+        // Extract unique months from the attendance data
+        const monthsSet = new Set();
+        attendanceData.forEach(record => {
+          const date = new Date(record.date);
+          const monthName = date.toLocaleString('default', { month: 'long' });
+          monthsSet.add(monthName);
+        });
+        
+        const available = Array.from(monthsSet);
+        setAvailableMonths(available);
+        
+        // If current month isn't available, select the first available month
+        if (available.length > 0 && !available.includes(selectedMonth)) {
+          setSelectedMonth(available[0]);
+        }
+        
+        // Now filter data for the selected month
+        const monthNumber = allMonths.indexOf(selectedMonth) + 1;
+        const monthData = attendanceData.filter(record => {
+          const date = new Date(record.date);
+          return (date.getMonth() + 1) === monthNumber;
+        });
+        
+        // Calculate student statistics
+        const studentStats = {};
+        monthData.forEach((record) => {
+          record.students?.forEach((student) => {
+            const id = student.studentId;
+            if (!studentStats[id]) {
+              studentStats[id] = { 
+                name: student.name,
+                Present: 0, 
+                Absent: 0, 
+                Leave: 0 
+              };
+            }
+
+            if (student.status === 0) {
+              studentStats[id].Present += 1;
+            } else if (student.status === 1) {
+              studentStats[id].Absent += 1;
+            } else if (student.status === 2) {
+              studentStats[id].Leave += 1;
+            }
+          });
+        });
+
+        // Format the data for display
+        const formattedStudents = Object.keys(studentStats).map((id) => ({
+          id: parseInt(id),
+          studentNumber: id,
+          studentName: studentStats[id].name,
+          Present: studentStats[id].Present,
+          Absent: studentStats[id].Absent,
+          Leave: studentStats[id].Leave,
+        }));
+
+        setFilteredData(formattedStudents);
+      } catch (error) {
+        console.error("Error fetching data:", error);
+      } finally {
+        setLoading(false);
+      }
     };
-  }
 
-  // Function to handle month change
-  handleMonthChange = (month) => {
-    this.setState({ selectedMonth: month });
-  };
+    fetchAttendanceData();
+  }, [class_Id, selectedMonth]);
 
-  // Dummy function to simulate downloading
-  handleDownload = () => {
-    const { tableHead } = this.state;
-    const tableData = this.generateTableData();
-
-    // Convert tableData to CSV format
-    const csvData = this.convertToCSV(tableHead, tableData);
-    
-    // Trigger file sharing (this simulates download without dependencies)
-    this.triggerDownload(csvData);
-  };
-
-  // Convert data into CSV format
-  convertToCSV = (header, data) => {
-    const headerRow = header.join(',') + '\n';
-    const dataRows = data.map(row => row.join(',')).join('\n');
-    return headerRow + dataRows;
-  };
-
-  // Generate dummy table data
-  generateTableData = () => {
-    const tableData = [];
-    const names = [
-      'Elvis Moren', 'Oscar Chu', 'Lauren Garsier'
-    ];
-
-    for (let i = 0; i < 30; i += 1) {
-      const rowData = [];
-      rowData.push(`${i + 2210182}`); // Student ID
-      rowData.push(names[i % names.length]); // Random name
-      rowData.push(Math.floor(Math.random() * 10)); // Random Present number
-      rowData.push(Math.floor(Math.random() * 10)); // Random Absent number
-      tableData.push(rowData);
+  const handleReset = () => {
+    if (availableMonths.includes(currentMonth)) {
+      setSelectedMonth(currentMonth);
+    } else if (availableMonths.length > 0) {
+      setSelectedMonth(availableMonths[0]);
     }
-
-    return tableData;
+    setShowMonthDropdown(false);
   };
 
-  // Trigger file sharing to simulate a download (you can export it to any app that supports file handling)
-  triggerDownload = (csvData) => {
-    const options = {
-      message: 'Attendance Data', // Optional message
-      url: `data:text/csv;charset=utf-8,${encodeURIComponent(csvData)}`, // CSV data as URI
-      title: 'Export Attendance Data',
-    };
+  const handleDownloadReport = async () => {
+    const csvContent = [
+      ['Student ID', 'Student Name', 'Present', 'Absent', 'Leave'],
+      ...filteredData.map(({ studentNumber, studentName, Present, Absent, Leave }) => [
+        studentNumber, studentName, Present, Absent, Leave,
+      ]),
+    ].map((row) => row.join(',')).join('\n');
 
-    Share.share(options).catch((error) => Alert.alert('Error', 'Unable to download the file.'));
+    const fileUri = FileSystem.documentDirectory + 'Attendance_Report.csv';
+    try {
+      await FileSystem.writeAsStringAsync(fileUri, csvContent, { encoding: FileSystem.EncodingType.UTF8 });
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(fileUri);
+      } else {
+        Alert.alert('Error', 'Sharing is not available on this device');
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Could not save the file');
+      console.error(error);
+    }
   };
 
-  render() {
-    const { tableHead, widthArr, selectedMonth } = this.state;
-    const tableData = this.generateTableData();
-
+  if (loading) {
     return (
-      <View style={styles.container}>
-        <View style={styles.headerContainer}>
-          <Text style={styles.headerTitle}>Student Report</Text>
-          <Icon name="notifications" size={24} color="#000" />
-        </View>
-
-        <View style={styles.dateTimePicker}>
-          <View style={styles.pickerContainer}>
-            <Text style={styles.label}>Month</Text>
-            <RNPickerSelect
-              onValueChange={this.handleMonthChange}
-              items={[
-                { label: 'All', value: 'All' }, // Added 'All' option
-                { label: 'January', value: 'January' },
-                { label: 'February', value: 'February' },
-                { label: 'March', value: 'March' },
-                { label: 'April', value: 'April' },
-                { label: 'May', value: 'May' },
-                { label: 'June', value: 'June' },
-              ]}
-              value={selectedMonth} // Set the selected month value
-              style={pickerSelectStyles} // Custom styles for the picker
-              useNativeAndroidPickerStyle={false} // Use custom styles for Android
-              placeholder={{ label: 'Select a month', value: null }} // Placeholder text
-            />
-          </View>
-          <TouchableOpacity onPress={this.handleDownload} style={styles.downloadButton}>
-            <Icon name="download" size={30} color="#000" />
-          </TouchableOpacity>
-        </View>
-
-        <ScrollView horizontal={true}>
-          <View>
-            <Table borderStyle={{ borderWidth: 1, borderColor: '#C1C0B9' }}>
-              <Row data={tableHead} widthArr={widthArr} style={styles.header} textStyle={styles.text} />
-            </Table>
-            <ScrollView style={styles.dataWrapper}>
-              <Table borderStyle={{ borderWidth: 1, borderColor: '#C1C0B9' }}>
-                {tableData.map((rowData, index) => (
-                  <Row
-                    key={index}
-                    data={rowData}
-                    widthArr={widthArr}
-                    style={styles.row}
-                    textStyle={styles.text}
-                  />
-                ))}
-              </Table>
-            </ScrollView>
-          </View>
-        </ScrollView>
-
-        <View style={styles.pagination}>
-          <TouchableOpacity style={styles.pageButton}>
-            <Text style={styles.pageButtonText}>{'<'}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.pageButton}>
-            <Text style={styles.pageButtonText}>1</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.pageButton}>
-            <Text style={styles.pageButtonText}>2</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.pageButton}>
-            <Text style={styles.pageButtonText}>{'>'}</Text>
-          </TouchableOpacity>
-        </View>
+      <View
+        className={`flex-1 justify-center items-center ${colorScheme === "dark" ? "bg-gray-800" : "bg-white"}`}
+      >
+        <Text>Loading...</Text>
       </View>
     );
   }
+
+  return (
+    <View className={`flex-1 p-4 ${colorScheme === 'dark' ? 'bg-gray-800' : 'bg-white'}`}>
+      <View className="flex-row items-center justify-between mb-5">
+        <TouchableOpacity onPress={handleReset} className="mr-2">
+          <Ionicons name="refresh-outline" size={24} color={colorScheme === 'dark' ? '#D1D5DB' : '#000'} />
+        </TouchableOpacity>
+
+        <View className="relative flex-1">
+          <TouchableOpacity
+            className={`w-36 flex-row items-center justify-between border rounded-[10px] p-3 ${colorScheme === 'dark' ? 'border-gray-300' : 'border-gray-300'}`}
+            onPress={() => setShowMonthDropdown(!showMonthDropdown)}
+          >
+            <Text style={{ color: colorScheme === 'dark' ? '#D1D5DB' : '#000' }}>
+              {selectedMonth}
+            </Text>
+            <Ionicons name={showMonthDropdown ? "chevron-up" : "chevron-down"} size={16} color={colorScheme === 'dark' ? '#D1D5DB' : '#000'} className="ml-2" />
+          </TouchableOpacity>
+          {showMonthDropdown && (
+            <View className={`absolute top-12 left-0 right-0 border border-gray-200 rounded-[10px] ${colorScheme === 'dark' ? 'bg-gray-700' : 'bg-white'} max-h-48 z-10 shadow-md w-36`}>
+              <FlatList
+                data={availableMonths}
+                keyExtractor={(item) => item}
+                className="rounded-[10px] overflow-hidden"
+                renderItem={({ item }) => (
+                  <TouchableOpacity
+                    className={`p-3 border-b ${colorScheme === 'dark' ? 'border-gray-500' : 'border-gray-200'}`}
+                    onPress={() => { setSelectedMonth(item); setShowMonthDropdown(false); }}
+                  >
+                    <Text style={{ color: colorScheme === 'dark' ? '#D1D5DB' : '#000' }}>{item}</Text>
+                  </TouchableOpacity>
+                )}
+              />
+            </View>
+          )}
+        </View>
+
+        <TouchableOpacity onPress={handleDownloadReport} className="p-2">
+          <Ionicons name="download-outline" size={24} color={colorScheme === 'dark' ? '#D1D5DB' : '#000'} />
+        </TouchableOpacity>
+      </View>
+
+      <View className={`flex-row justify-between p-3 ${colorScheme === 'dark' ? 'bg-gray-400' : 'bg-gray-100'}`}>
+        <Text className="flex-1 text-center font-semibold">Student ID</Text>
+        <Text className="flex-1 text-center font-semibold">Student Name</Text>
+        <Text className="flex-1 text-center font-semibold">Present</Text>
+        <Text className="flex-1 text-center font-semibold">Absent</Text>
+        <Text className="flex-1 text-center font-semibold">Leave</Text>
+      </View>
+
+      <FlatList
+        data={filteredData}
+        keyExtractor={(item, index) => index.toString()}
+        renderItem={({ item }) => (
+          <TouchableOpacity
+            onPress={() =>
+              router.push({
+                pathname: "/(tutor)/setting",
+                params: { 
+                  studentId: item.id, 
+                  class_Id: class_Id,
+                  studentName: item.studentName // Passing the student name here
+                },
+              })
+            }
+          >
+            <View className={`flex-row justify-between items-center p-3 ${colorScheme === 'dark' ? 'bg-gray-800' : 'bg-white'}`}>
+              <Text className="flex-1 text-center" style={{ color: colorScheme === 'dark' ? '#D1D5DB' : '#000' }}>{item.studentNumber}</Text>
+              <Text className="flex-1 text-center" style={{ color: colorScheme === 'dark' ? '#D1D5DB' : '#000' }}>{item.studentName}</Text>
+              <Text className="flex-1 text-center text-green-500">{item.Present}</Text>
+              <Text className="flex-1 text-center text-red-500">{item.Absent}</Text>
+              <Text className="flex-1 text-center text-blue-500">{item.Leave}</Text>
+            </View>
+          </TouchableOpacity>
+        )}
+      />
+    </View>
+  );
 }
-
-// Styles for RNPickerSelect
-const pickerSelectStyles = StyleSheet.create({
-  inputIOS: {
-    backgroundColor: '#7647EB',
-    padding: 12,
-    borderRadius: 8,
-    color: 'white',
-    fontSize: 16,
-    marginRight: 10,
-  },
-  inputAndroid: {
-    borderRadius: 8,
-    color: 'white',
-    fontSize: 16,
-    marginRight: 10,
-  },
-});
-
-const styles = StyleSheet.create({
-  container: { flex: 1, padding: 16, paddingTop: 30, backgroundColor: '#fff' },
-  headerContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#7647EB',
-  },
-  dateTimePicker: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 20,
-  },
-  label: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#7647EB',
-    marginRight: 10,
-  },
-  downloadButton: {
-    padding: 5,
-  },
-  header: { height: 50, backgroundColor: '#7647EB' }, // Purple background for header
-  text: { textAlign: 'center', fontWeight: '100', color: '#000' },
-  dataWrapper: { marginTop: -1 },
-  row: { height: 40, backgroundColor: '#fff' }, // White background for cells
-  pagination: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 10,
-  },
-  pageButton: {
-    marginHorizontal: 5,
-    padding: 10,
-    backgroundColor: '#7647EB',
-    borderRadius: 5,
-  },
-  pageButtonText: {
-    color: '#fff',
-    fontWeight: '600',
-  },
-});
