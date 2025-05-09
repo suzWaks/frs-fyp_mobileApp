@@ -8,7 +8,7 @@
     "scheme": "myapp",
     "userInterfaceStyle": "automatic",
     "extra":{
-      "API_BASE_URL": "http://localhost:5253/api"
+      "API_BASE_URL": "http://10.2.4.216:5253/api"
     },
     "newArchEnabled": true,
     "ios": {

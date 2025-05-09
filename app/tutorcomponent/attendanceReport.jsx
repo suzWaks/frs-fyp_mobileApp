@@ -8,6 +8,7 @@ import {
   TouchableWithoutFeedback,
   ActivityIndicator
 } from "react-native";
+import Constants from "expo-constants";
 import { useColorScheme } from "nativewind";
 import { BarChart } from "react-native-chart-kit";
 import { Dimensions } from "react-native";
@@ -15,7 +16,7 @@ import { useRouter, useLocalSearchParams } from "expo-router";
 import Svg, { Circle } from "react-native-svg";
 
 const screenWidth = Dimensions.get("window").width;
-const API_BASE_URL = "http://localhost:5253/api";
+const API_BASE_URL = Constants.expoConfig.extra.API_BASE_URL;
 
 export default function AttendanceReport() {
   const { colorScheme } = useColorScheme();
@@ -55,39 +56,43 @@ export default function AttendanceReport() {
   const processMonthlyData = (records) => {
     if (!records || records.length === 0) return;
   
-    // Extract unique months from the records
-    const monthMap = {};
+    // Initialize all months with 0 values
     const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "June", "July", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const monthMap = {};
+    
+    // Initialize all months
+    monthNames.forEach(month => {
+      monthMap[month] = {
+        present: 0,
+        total: 0
+      };
+    });
   
+    // Populate with actual data
     records.forEach(record => {
       const date = new Date(record.date);
       const month = date.getMonth(); // 0-11
       const monthName = monthNames[month];
       
-      if (!monthMap[monthName]) {
-        monthMap[monthName] = {
-          present: 0,
-          total: 0
-        };
-      }
-  
       record.students.forEach(student => {
         monthMap[monthName].total++;
         if (student.status === 0) { // Only count as present if status is 0
           monthMap[monthName].present++;
         }
-        // Status 1 (leave) and 2 (absent) are automatically not counted as present
       });
     });
   
     // Prepare data for chart
-    const months = Object.keys(monthMap);
+    const months = monthNames; // Show all months
     const percentages = months.map(month => {
-      const percentage = (monthMap[month].present / monthMap[month].total) * 100;
-      return Math.round(percentage);
+      if (monthMap[month].total > 0) {
+        const percentage = (monthMap[month].present / monthMap[month].total) * 100;
+        return Math.round(percentage);
+      }
+      return 0; // Return 0 if no data for the month
     });
   
-    console.log("Available months:", months);
+    console.log("All months data:", monthMap);
     setAvailableMonths(months);
     setMonthlyPresentPercentage(percentages);
   };
@@ -101,6 +106,7 @@ export default function AttendanceReport() {
   
     const studentAttendanceMap = new Map();
   
+    // Process all records across all months
     records.forEach(record => {
       record.students.forEach(student => {
         if (!studentAttendanceMap.has(student.studentId)) {
@@ -165,7 +171,7 @@ export default function AttendanceReport() {
     useShadowColorFromDataset: false,
   };
 
-  // Monthly Data calculated from actual records
+  // Monthly Data showing all months
   const monthlyData = {
     labels: availableMonths,
     datasets: [
@@ -275,13 +281,13 @@ export default function AttendanceReport() {
               <View className="flex-row items-center gap-x-2 mb-5">
                 <Text className={`text-base ${colorScheme === "dark" ? "text-gray-400" : "text-black"}`}>No attendance Issue</Text>
                 <Text className={`text-base font-semibold ${colorScheme === "dark" ? "text-gray-400" : "text-black"}`}>
-                  {noAttendanceIssueCount}
+                  {noAttendanceIssueCount} 
                 </Text>
               </View>
               <View className="flex-row items-center gap-x-2">
                 <Text className={`text-base ${colorScheme === "dark" ? "text-gray-400" : "text-black"}`}>Attendance Issue</Text>
                 <Text className={`text-base font-semibold ${colorScheme === "dark" ? "text-gray-400" : "text-black"}`}>
-                  {attendanceIssueCount}
+                  {attendanceIssueCount} 
                 </Text>
               </View>
             </View>
@@ -291,18 +297,8 @@ export default function AttendanceReport() {
         {/* Students Present Percentage */}
         <View className="flex-row justify-between items-center mb-4">
           <Text className={`text-lg font-semibold ${colorScheme === "dark" ? "text-gray-400" : "text-black"}`}>
-            Present Percentage
+            Monthly Present Percentage
           </Text>
-          <View className="flex-row bg-primary-100 dark:bg-gray-700 rounded-[10px]">
-            <TouchableOpacity
-              onPress={() => setChartView("month")}
-              className={`px-2 py-1 rounded-[10px] ${chartView === "month" ? "bg-primary dark:bg-purple-600" : "bg-transparent"}`}
-            >
-              <Text className={`${chartView === "month" ? "text-white" : "text-gray-600 dark:text-gray-300"}`}>
-                Months
-              </Text>
-            </TouchableOpacity>
-          </View>
         </View>
 
         {/* Scrollable Bar Chart */}
@@ -310,22 +306,16 @@ export default function AttendanceReport() {
           <View 
             className={`p-4 rounded-lg shadow-md items-center w-full ${colorScheme === "dark" ? "bg-gray-800" : "bg-gray-100"}`}
           >
-            {availableMonths.length > 0 ? (
-              <BarChart
-                data={monthlyData}
-                width={screenWidth * 2}
-                height={200}
-                yAxisSuffix="%"
-                chartConfig={chartConfig}
-                showValuesOnTopOfBars
-                fromZero
-                style={{ borderRadius: 16, alignSelf: "center" }}
-              />
-            ) : (
-              <Text className={`text-center ${colorScheme === "dark" ? "text-gray-400" : "text-black"}`}>
-                No attendance data available for any month
-              </Text>
-            )}
+            <BarChart
+              data={monthlyData}
+              width={screenWidth * 1.5} // Adjusted width to fit all months
+              height={220}
+              yAxisSuffix="%"
+              chartConfig={chartConfig}
+              showValuesOnTopOfBars
+              fromZero
+              style={{ borderRadius: 16, alignSelf: "center" }}
+            />
           </View>
         </ScrollView>
 
@@ -336,7 +326,7 @@ export default function AttendanceReport() {
           className={`p-4 rounded-[10px] shadow-md w-full mt-5 ${colorScheme === "dark" ? "bg-gray-800" : "bg-purple-100"}`}
         >
           <View className="flex-row items-center justify-between">
-            <Text className={`text-lg font-bold ${colorScheme === "dark" ? "text-gray-400" : "text-black"}`}>Student Report</Text>
+            <Text className={`text-lg font-bold ${colorScheme === "dark" ? "text-gray-400" : "text-black"}`}>Detailed Reports</Text>
             <TouchableOpacity
               className="bg-primary rounded-[10px] px-6 py-3"
               onPress={toggleDropdown}
@@ -363,7 +353,7 @@ export default function AttendanceReport() {
                   closeDropdown();
                 }}
               >
-                <Text className="text-black text-center">Daily</Text>
+                <Text className="text-black text-center">Daily Report</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 className={`px-4 py-2 rounded-[10px] ${colorScheme === "dark" ? "bg-gray-700" : "bg-purple-100"}`}
@@ -375,7 +365,7 @@ export default function AttendanceReport() {
                   closeDropdown();
                 }}
               >
-                <Text className="text-black text-center">Monthly</Text>
+                <Text className="text-black text-center">Monthly Report</Text>
               </TouchableOpacity>
             </Animated.View>
           )}

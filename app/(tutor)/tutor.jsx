@@ -21,6 +21,21 @@ export default function HeaderScreen() {
   const lightPrimary = '#9D71EE';
   const lightestPrimary = '#CDABFF';
 
+  // Array of different colors for module headers
+  const moduleHeaderColors = [ 
+   '#009db8',  
+   '#0071ff',
+    '#00a17f',
+    '#7647eb', 
+    '#a994c8', 
+    '#0095ea', 
+  ];
+
+  // Function to get a color based on module code or index
+  const getModuleColor = (index) => {
+    return moduleHeaderColors[index % moduleHeaderColors.length];
+  };
+
   // Header icon/text colors
   const headerIconColor = colorScheme === 'dark' ? '#E0E0E0' : '#000';
   const headerTextColor = colorScheme === 'dark' ? '#E0E0E0' : '#000';
@@ -29,31 +44,52 @@ export default function HeaderScreen() {
   useEffect(() => {
     const loadUserData = async () => {
       try {
-        // Load user role from AsyncStorage
-        const userData = await AsyncStorage.getItem('userData');
-        if (userData) {
-          const { role } = JSON.parse(userData);
-          setUserRole(role.toLowerCase());
+        // Load user data from AsyncStorage
+        const userDataString = await AsyncStorage.getItem('userData');
+        
+        if (!userDataString) {
+          console.log('No user data found in storage');
+          return;
         }
-        const storedRole = await AsyncStorage.getItem("role");
-        if (storedRole) {
-          setIsTutorMode(storedRole === "tutor");
+  
+        const userData = JSON.parse(userDataString);
+        console.log('Loaded user data:', userData); // Debug log
+  
+        // Set user role
+        if (userData.role) {
+          const role = userData.role.toLowerCase();
+          setUserRole(role);
+          
+          // Set tutor mode if role is tutor or PL
+          setIsTutorMode(role === 'tutor' || role === 'pl');
         }
-
-        // Fetch staff data from API
-        const response = await fetch(`${API_BASE_URL}/Staffs`);
-        const data = await response.json();
-        const staffId = 1; // You might want to get this from user data
-        const staff = data.find((staff) => staff.staff_Id === staffId);
-        if (staff) {
-          setStaffData(staff);
-        } else {
-          console.error(`Staff with ID ${staffId} not found`);
-        }
+  
+        // Check if we have a staff ID (for staff members)
+        if (userData.staffId) {
+          console.log('Fetching data for staff ID:', userData.staffId); // Debug log
+          
+          // Fetch staff data from API
+          const response = await fetch(`${API_BASE_URL}/Staffs`);
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+          
+          const data = await response.json();
+          const staff = data.find((staff) => staff.staff_Id === userData.staffId);
+          
+          if (staff) {
+            console.log('Found staff data:', staff); // Debug log
+            setStaffData(staff);
+          } else {
+            console.error(`Staff with ID ${userData.staffId} not found`);
+          }
+        } 
       } catch (error) {
         console.error('Error loading data:', error);
+        // You might want to add error handling here (e.g., show a toast)
       }
     };
+  
     loadUserData();
   }, []);
 
@@ -121,7 +157,7 @@ export default function HeaderScreen() {
   };
 
   const handleProfileIconPress = () => {
-    router.push("/profile/profile"); 
+    router.push(`/profile/profile?id=${staffData.id}`); // Navigate to the profile screen
   };
 
   const handleTakeAttendancePress = (class_Id) => {
@@ -199,21 +235,21 @@ export default function HeaderScreen() {
 
         <View style={styles.contentContainer}>
           {/* Recent Modules */}
-          <Text style={[styles.sectionTitle, { color: primaryColor }]}>Recent</Text>
+          <Text style={[styles.sectionTitle, { color: '#000' }]}>Recent</Text>
           <View style={[styles.cardContainer, { backgroundColor: colorScheme === "dark" ? "#1E1E1E" : "#fff" }]}>
             <ScrollView horizontal showsHorizontalScrollIndicator={true} style={{ borderRadius: 10 }}>
               {staffData.classes.map((module, index) => (
                 <View key={index} style={[styles.moduleCard, { backgroundColor: colorScheme === "dark" ? "#2D2D2D" : "#fff" }]}>
-                  <View style={[styles.moduleHeader, { backgroundColor: primaryColor }]}>
+                  <View style={[styles.moduleHeader, { backgroundColor: getModuleColor(index) }]}>
                     <View>
                       <Text style={[styles.moduleCode, { color: '#fff' }]}>{module.module_Code}</Text>
                       <Text style={[styles.moduleName, { color: 'rgba(255,255,255,0.8)' }]}>{module.class_Name}</Text>
                     </View>
                     <TouchableOpacity 
                       onPress={() => toggleDropdown(index, 'recent')}
-                      style={[styles.viewButton, { backgroundColor: lightPrimary }]}
+                      style={[styles.viewButton, { backgroundColor: getModuleColor(index) }]}
                     >
-                      <Text style={styles.viewButtonText}>View</Text>
+                      <Text style={[styles.viewButtonText, { textDecorationLine: 'underline' }]}>View</Text>
                     </TouchableOpacity>
                   </View>
 
@@ -221,7 +257,7 @@ export default function HeaderScreen() {
                   <View style={styles.attendanceButtonContainer}>
                     <TouchableOpacity 
                       onPress={() => handleTakeAttendancePress(module.class_Id)} 
-                      style={[styles.attendanceButton, { backgroundColor: primaryColor }]}
+                      style={[styles.attendanceButton, { backgroundColor: getModuleColor(index) }]}
                     >
                       <Text style={styles.attendanceButtonText}>Take Attendance</Text>
                     </TouchableOpacity>
@@ -231,7 +267,7 @@ export default function HeaderScreen() {
                   {recentViewOptionsVisible === index && (
                     <Animated.View
                       style={[styles.dropdownMenu, { 
-                        backgroundColor: lightPrimary,
+                        backgroundColor: getModuleColor(index),
                         opacity: dropdownOpacity,
                         transform: [{ translateY: dropdownTranslateY }],
                       }]}
@@ -256,20 +292,20 @@ export default function HeaderScreen() {
           </View>
 
           {/* All Modules */}
-          <Text style={[styles.sectionTitle, { color: primaryColor }]}>All Modules</Text>
+          <Text style={[styles.sectionTitle, { color: '#000' }]}>All Modules</Text>
           <ScrollView style={styles.verticalScroll}>
             {staffData.classes.map((module, index) => (
               <View key={index} style={[styles.moduleCardVertical, { backgroundColor: colorScheme === "dark" ? "#2D2D2D" : "#fff" }]}>
-                <View style={[styles.moduleHeader, { backgroundColor: primaryColor }]}>
+                <View style={[styles.moduleHeader, { backgroundColor: getModuleColor(index) }]}>
                   <View>
                     <Text style={[styles.moduleCode, { color: '#fff' }]}>{module.module_Code}</Text>
                     <Text style={[styles.moduleName, { color: 'rgba(255,255,255,0.8)' }]}>{module.class_Name}</Text>
                   </View>
                   <TouchableOpacity 
                     onPress={() => toggleDropdown(index, 'allModules')}
-                    style={[styles.viewButton, { backgroundColor: lightPrimary }]}
+                    style={[styles.viewButton, { backgroundColor:getModuleColor(index)}]}
                   >
-                    <Text style={styles.viewButtonText}>View</Text>
+                    <Text style={[styles.viewButtonText, { textDecorationLine: 'underline' }]}>View</Text>
                   </TouchableOpacity>
                 </View>
 
@@ -277,7 +313,7 @@ export default function HeaderScreen() {
                 <View style={styles.attendanceButtonContainer}>
                   <TouchableOpacity 
                     onPress={() => handleTakeAttendancePress(module.class_Id)} 
-                    style={[styles.attendanceButton, { backgroundColor: primaryColor }]}
+                    style={[styles.attendanceButton, { backgroundColor: getModuleColor(index) }]}
                   >
                     <Text style={styles.attendanceButtonText}>Take Attendance</Text>
                   </TouchableOpacity>
@@ -287,7 +323,7 @@ export default function HeaderScreen() {
                 {allModulesViewOptionsVisible === index && (
                   <Animated.View
                     style={[styles.dropdownMenuVertical, { 
-                      backgroundColor: lightPrimary,
+                      backgroundColor: getModuleColor(index),
                       opacity: dropdownOpacity,
                       transform: [{ translateY: dropdownTranslateY }],
                     }]}

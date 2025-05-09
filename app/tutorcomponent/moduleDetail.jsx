@@ -87,7 +87,7 @@ export default function ModuleDetails() {
       if (updateResponse.ok) {
         console.log("Enrollment key updated successfully:", result);
       } else {
-        console.error("Failed to update enrollment key:", result?.message || updateResponse.statusText);
+        //console.error("Failed to update enrollment key:", result?.message || updateResponse.statusText);
       }
     } catch (error) {
       console.error("Error updating enrollment key:", error);

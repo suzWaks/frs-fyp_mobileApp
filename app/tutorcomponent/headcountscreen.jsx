@@ -19,10 +19,7 @@ export default function HeadCountScreen() {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [selectedTime, setSelectedTime] = useState("Select Time");
   const [showTimeDropdown, setShowTimeDropdown] = useState(false);
-  const timeSlots = ["08:00-9:00",
-    "09:00-10:00",
-    "10:15-11:15",
-    "11:15-12:15",];
+  const timeSlots = ["08:00 - 9:00","09:00 - 10:00","10:15 - 11:15","11:15 - 12:15","1:15 - 2:15", ]; 
 
   useEffect(() => {
     const fetchData = async () => {
@@ -107,8 +104,65 @@ export default function HeadCountScreen() {
     setSelectedTime("Select Time");
   };
 
-  const handleDonePress = () => {
-    router.back();
+  const handleDonePress = async () => {
+    try {
+      if (selectedTime === "Select Time") {
+        alert("Please select a time slot");
+        return;
+      }
+  
+      const attendanceData = {
+        classId: parseInt(class_Id),
+        locationId: 1,
+        timeInterval: selectedTime,
+        studentStatuses: students.map(student => ({
+          studentId: parseInt(student.id),
+          status: capitalizeFirstLetter(student.status)
+        }))
+      };
+  
+      console.log("Sending attendance data:", JSON.stringify(attendanceData, null, 2));
+  
+      const response = await fetch(`${API_BASE_URL}/AttendanceRecords/headcount`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(attendanceData),
+      });
+  
+      const responseText = await response.text();
+      console.log("Response Text:", responseText);
+  
+      if (!response.ok) {
+        throw new Error(responseText);
+      }
+  
+      const successData = JSON.parse(responseText);
+      console.log("Attendance saved successfully:", successData);
+  
+      router.push({
+        pathname: "/(tutor)/tutor",
+        params: { attendanceSuccess: "true" },
+      });
+    } catch (error) {
+      console.error("Error saving attendance:", error);
+      alert(`Failed to save attendance: ${error.message}`);
+    }
+  };
+  
+  // Helper function to capitalize first letter and format status
+  const capitalizeFirstLetter = (status) => {
+    switch (status) {
+      case 'present':
+        return 'Present';
+      case 'absent':
+        return 'Absent';
+      case 'leave':
+        return 'Leave';
+      default:
+        return status;
+    }
   };
 
   const presentCount = students.filter(

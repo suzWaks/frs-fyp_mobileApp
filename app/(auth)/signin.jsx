@@ -13,7 +13,7 @@ const isSmallDevice = width < 375;
 // Configuration
 // Update API_CONFIG to use HTTP instead of HTTPS
 const API_CONFIG = {
-  BASE_URL: Constants.expoConfig?.extra?.API_BASE_URL || 'http://10.0.2.2:5253/api',  // Updated for Android emulator
+  BASE_URL: Constants.expoConfig?.extra?.API_BASE_URL || 'http://192.168.137.249:5253/api',  // Updated for Android emulator
   ENDPOINTS: {
     STAFFS: '/Staffs',
     STUDENTS: '/Students'

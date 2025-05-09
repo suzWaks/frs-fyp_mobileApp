@@ -35,9 +35,9 @@ const ROUTES = {
 const API_CONFIG = {
   BASE_URL: Platform.select({
     web: 'http://localhost:5253/api',
-    android: 'http://10.0.2.2:5253/api',
-    ios: 'http://localhost:5253/api',
-    default: 'http://localhost:5253/api'
+    android: 'http://10.2.4.216:5253/api',
+    ios: 'http://10.2.4.216:5253/api',
+    default: 'http://10.2.4.216:5253/api'
   }),
   ENDPOINTS: {
     STAFFS: '/Staffs',
@@ -78,6 +78,8 @@ export default function GoogleSignInScreen() {
       const staffMember = staffList.find(staff => staff.email.toLowerCase() === trimmedEmail);
   
       if (staffMember) {
+        //console.log('Staff member raw data:', staffMember);
+        console.log('Staff ID:', staffMember.staff_Id);
         console.log('Staff member data:', {
           roleId: staffMember.role_Id,
           roleName: staffMember.role?.role_Name
