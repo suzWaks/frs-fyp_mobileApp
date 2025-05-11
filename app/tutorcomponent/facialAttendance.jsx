@@ -1,9 +1,12 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { View, Text, TouchableOpacity, FlatList } from "react-native";
 import { FontAwesome5 } from "@expo/vector-icons";
-import DateTimePicker from "@react-native-community/datetimepicker"; // Import DateTimePicker
+import DateTimePicker from "@react-native-community/datetimepicker";
 import { useRouter } from "expo-router";
-import { useColorScheme } from "nativewind"; // For dark mode support
+import { useColorScheme } from "nativewind";
+import Constants from "expo-constants";
+
+const API_BASE_URL = Constants.expoConfig.extra.API_BASE_URL; // Replace with your actual API base URL
 
 const CustomDropdown = ({
   selectedValue,
@@ -60,7 +63,8 @@ export default function FacialAttendance() {
   const { colorScheme, toggleColorScheme } = useColorScheme();
   const [selectedTime, setSelectedTime] = useState("10:00 - 12:00 AM");
   const [selectedTimeLimit, setSelectedTimeLimit] = useState("5 Minutes");
-  const [selectedCoordinates, setSelectedCoordinates] = useState("CR-15");
+  const [selectedCoordinates, setSelectedCoordinates] = useState("");
+  const [locationOptions, setLocationOptions] = useState([]);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [dropdownOpen, setDropdownOpen] = useState({
     date: false,
@@ -69,8 +73,32 @@ export default function FacialAttendance() {
     timeLimit: false,
   });
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [loadingLocations, setLoadingLocations] = useState(true);
 
   const router = useRouter();
+
+  useEffect(() => {
+    const fetchLocations = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/Locations`);
+        if (!response.ok) {
+          throw new Error('Failed to fetch locations');
+        }
+        const data = await response.json();
+        const locationNames = data.map(location => location.locationName);
+        setLocationOptions(locationNames);
+        if (locationNames.length > 0) {
+          setSelectedCoordinates(locationNames[0]);
+        }
+      } catch (error) {
+        console.error('Error fetching locations:', error);
+      } finally {
+        setLoadingLocations(false);
+      }
+    };
+
+    fetchLocations();
+  }, []);
 
   const toggleDropdown = (field) => {
     setDropdownOpen((prev) => ({
@@ -138,15 +166,17 @@ export default function FacialAttendance() {
         />
 
         {/* Coordinates Field */}
-        <CustomDropdown
-          selectedValue={selectedCoordinates}
-          onValueChange={setSelectedCoordinates}
-          options={["CR-15", "CR-16", "CR-17"]}
-          isOpen={dropdownOpen.coordinates}
-          toggleOpen={() => toggleDropdown("coordinates")}
-          icon="map-marker-alt"
-          customStyles={customStyles}
-        />
+        {!loadingLocations && (
+          <CustomDropdown
+            selectedValue={selectedCoordinates}
+            onValueChange={setSelectedCoordinates}
+            options={locationOptions}
+            isOpen={dropdownOpen.coordinates}
+            toggleOpen={() => toggleDropdown("coordinates")}
+            icon="map-marker-alt"
+            customStyles={customStyles}
+          />
+        )}
 
         {/* Time Limit Field */}
         <CustomDropdown

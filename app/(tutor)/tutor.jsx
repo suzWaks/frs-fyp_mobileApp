@@ -24,7 +24,7 @@ export default function HeaderScreen() {
   // Array of different colors for module headers
   const moduleHeaderColors = [ 
    '#009db8',  
-   '#0071ff',
+   '#3B82F6',
     '#00a17f',
     '#7647eb', 
     '#a994c8', 

@@ -1,4 +1,12 @@
-import {View,Text,TouchableOpacity,FlatList,Alert,Platform,} from "react-native";
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  FlatList,
+  Alert,
+  Platform,
+  StyleSheet,
+} from "react-native";
 import React, { useState, useEffect } from "react";
 import { useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -7,13 +15,46 @@ import * as Sharing from "expo-sharing";
 import { useColorScheme } from "nativewind";
 import * as WebBrowser from "expo-web-browser";
 import Constants from "expo-constants";
-import Svg, { Circle } from "react-native-svg";
 
 const statusOptions = [
   { label: "Present", color: "#28a745" },
   { label: "Absent", color: "#dc3545" },
   { label: "Leave", color: "#007bff" },
 ];
+
+// Helper function to calculate hours from time interval
+const calculateHours = (timeInterval) => {
+  if (!timeInterval) return 0;
+  
+  try {
+    // Handle different time interval formats
+    const parts = timeInterval.split(/[-–]/).map(part => part.trim());
+    if (parts.length !== 2) return 0;
+    
+    const [startTime, endTime] = parts;
+    
+    // Parse hours and minutes
+    const parseTime = (timeStr) => {
+      const [hours, minutes] = timeStr.split(':').map(Number);
+      return { hours: isNaN(hours) ? 0 : hours, minutes: isNaN(minutes) ? 0 : minutes };
+    };
+    
+    const start = parseTime(startTime);
+    const end = parseTime(endTime);
+    
+    // Calculate total minutes
+    const startTotalMinutes = start.hours * 60 + start.minutes;
+    const endTotalMinutes = end.hours * 60 + end.minutes;
+    
+    // Calculate difference in hours
+    const totalHours = (endTotalMinutes - startTotalMinutes) / 60;
+    
+    return totalHours > 0 ? totalHours : 0;
+  } catch (error) {
+    console.error("Error calculating hours:", error);
+    return 0;
+  }
+};
 
 export default function IndividualReport() {
   const { colorScheme } = useColorScheme();
@@ -54,6 +95,7 @@ export default function IndividualReport() {
               ? "Absent"
               : "Leave",
           class_Id: record.attendanceRecord.class_Id,
+          hours: calculateHours(record.attendanceRecord.time_Interval),
         }));
 
         setAttendanceRecords(formattedRecords);
@@ -113,20 +155,23 @@ export default function IndividualReport() {
     }
   };
 
-  // Calculate hours (assuming each class is 2 hours)
-  const totalHours = attendanceRecords.length * 2;
-  const presentHours =
-    attendanceRecords.filter((r) => r.status === "Present").length * 2;
-  const absentHours =
-    attendanceRecords.filter((r) => r.status === "Absent").length * 2;
-  const leaveHours =
-    attendanceRecords.filter((r) => r.status === "Medical Leave").length * 2;
+  // Calculate total hours and hours by status
+  const totalHours = attendanceRecords.reduce((sum, record) => sum + (record.hours || 0), 0);
+  const presentHours = attendanceRecords
+    .filter((r) => r.status === "Present")
+    .reduce((sum, record) => sum + (record.hours || 0), 0);
+  const absentHours = attendanceRecords
+    .filter((r) => r.status === "Absent")
+    .reduce((sum, record) => sum + (record.hours || 0), 0);
+  const leaveHours = attendanceRecords
+    .filter((r) => r.status === "Leave")
+    .reduce((sum, record) => sum + (record.hours || 0), 0);
 
   const radius = 45;
   const strokeWidth = 10;
   const circumference = 2 * Math.PI * radius;
   const attendancePercentage =
-    attendanceRecords.length === 0 ? 0 : presentHours / totalHours;
+    totalHours === 0 ? 0 : presentHours / totalHours;
 
   if (loading) {
     return (
@@ -146,6 +191,15 @@ export default function IndividualReport() {
         colorScheme === "dark" ? "bg-gray-800" : "bg-white"
       }`}
     >
+      <View className="items-center mb-3">
+        <Text
+          className={`text-lg font-bold mb-2 ${
+            colorScheme === "dark" ? "text-gray-400" : "text-black"
+          }`}
+        >
+          {"Individual Report"}
+        </Text>
+      </View>
       {/* Student Profile Section */}
       <View className="mb-4 flex-row items-center space-x-2">
         <Ionicons name="person-sharp" size={20} color={iconColor} />
@@ -156,88 +210,37 @@ export default function IndividualReport() {
 
       {/* Attendance Summary Card */}
       <View
-        className="flex-row mb-6 p-4"
-        style={{
-          borderWidth: 2,
-          borderColor: "#D1D5DB",
-          borderRadius: 12,
-          shadowColor: "#000",
-          shadowOffset: { width: 0, height: 4 },
-          shadowOpacity: 0.1,
-          shadowRadius: 6,
-          backgroundColor: colorScheme === "dark" ? "#1F2937" : "#fff",
-        }}
+        style={[
+          styles.attendanceSummary,
+          {
+            backgroundColor: colorScheme === "dark" ? "#1F2937" : "#fff",
+          },
+        ]}
       >
-        {/* Attendance Ring */}
-        <View className="items-center w-1/2">
-          <Svg width={100} height={100} viewBox="0 0 100 100">
-            <Circle
-              cx="50"
-              cy="50"
-              r={radius}
-              stroke="#E9D5FF"
-              strokeWidth={strokeWidth}
-              fill="none"
-            />
-            <Circle
-              cx="50"
-              cy="50"
-              r={radius}
-              stroke="#7C3AED"
-              strokeWidth={strokeWidth}
-              fill="none"
-              strokeDasharray={`${
-                attendancePercentage * circumference
-              } ${circumference}`}
-              strokeLinecap="round"
-            />
-          </Svg>
-          <View
-            className="absolute"
-            style={{
-              top: 45,
-              left: 73,
-              transform: [{ translateX: -20 }, { translateY: -10 }],
-            }}
-          >
-            <Text
-              className={`text-xl font-bold ${
-                colorScheme === "dark" ? "text-gray-400" : "text-black"
-              }`}
-            >
-              {Math.round(attendancePercentage * 100)}%
-            </Text>
-          </View>
+        <View style={styles.summaryItem}>
+          <Text style={[styles.summaryCount, styles.presentCount]}>
+            {presentHours.toFixed(0)}hrs
+          </Text>
+          <Text style={[styles.summaryLabel, styles.presentLabel]}>
+            Present
+          </Text>
         </View>
-
-        {/* Attendance Stats */}
-        <View className="w-1/2 justify-center space-y-2 px-2">
-          <Text
-            className={`text-base ${
-              colorScheme === "dark" ? "text-gray-300" : "text-black"
-            }`}
-          >
-            Total Hours: {totalHours} hrs
+        <View style={styles.summaryItem}>
+          <Text style={[styles.summaryCount, styles.absentCount]}>
+            {absentHours.toFixed(0)}hrs
           </Text>
-          <Text
-            className={`text-base ${
-              colorScheme === "dark" ? "text-gray-300" : "text-black"
-            }`}
-          >
-            Absent: {absentHours} hrs
+          <Text style={[styles.summaryLabel, styles.absentLabel]}>Absent</Text>
+        </View>
+        <View style={styles.summaryItem}>
+          <Text style={[styles.summaryCount, styles.leaveCount]}>
+            {leaveHours.toFixed(0)}hrs
           </Text>
-          <Text
-            className={`text-base ${
-              colorScheme === "dark" ? "text-gray-300" : "text-black"
-            }`}
-          >
-            Leave: {leaveHours} hrs
-          </Text>
+          <Text style={[styles.summaryLabel, styles.leaveLabel]}>Leave</Text>
         </View>
       </View>
 
       {/* Download Button */}
-      <View className="flex-row justify-end items-center mb-4">
+      <View className="flex-row justify-end items-center mb-1">
         <TouchableOpacity
           onPress={handleDownloadReport}
           className="p-2"
@@ -318,3 +321,64 @@ export default function IndividualReport() {
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  attendanceSummary: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 24,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: "#D1D5DB",
+    borderRadius: 10,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+  },
+  summaryItem: {
+    alignItems: "center",
+    justifyContent: "center",
+    flex: 1,
+  },
+  summaryCount: {
+    fontSize: 20,
+    fontWeight: "bold",
+    paddingHorizontal: 20,
+    paddingVertical: 24,
+    borderRadius: 50,
+    color: "#fff",
+    marginBottom: 10,
+  },
+  summaryLabel: {
+    fontSize: 14,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 20,
+    color: "#fff",
+  },
+  presentCount: {
+    color: "#28a745",
+    backgroundColor: "#90EE90",
+  },
+  absentCount: {
+    color: "#dc3545",
+    backgroundColor: "#FFCCCB",
+  },
+  leaveCount: {
+    color: "#007bff",
+    backgroundColor: "#ADD8E6",
+  },
+  presentLabel: {
+    color: "#fff",
+    backgroundColor: "green",
+  },
+  absentLabel: {
+    color: "#fff",
+    backgroundColor: "red",
+  },
+  leaveLabel: {
+    color: "#fff",
+    backgroundColor: "blue",
+  },
+});
