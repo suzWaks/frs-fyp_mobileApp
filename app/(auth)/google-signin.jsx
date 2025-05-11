@@ -1,5 +1,5 @@
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, Dimensions, Platform } from 'react-native';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { router } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -8,30 +8,18 @@ import Toast from 'react-native-toast-message';
 
 const { width, height } = Dimensions.get('window');
 
-// Update the API_CONFIG to use the configuration from app.json
-// Add ROLE_MAP and ROUTES constants
-// Update the ROLE_MAP to match the schema where role_Id starts from 0
-// Update the ROLE_MAP to match the actual role IDs from the backend
-const ROLE_MAP = {
-  1: 'ADMIN',
-  2: 'DAA',
-  3: 'PL',
-  4: 'TUTOR',
-  5: 'STUDENT'
-};
+// Initialize ROLE_MAP as empty object, will be populated after fetching roles
+let ROLE_MAP = {};
 
 const ROUTES = {
   ADMIN: '/admin/dashboard',
   TUTOR: '/(tutor)/tutor',
   STUDENT: '/(students)/student',
   DAA: '/(tabs)/home',
-  PL: '/(tutor)/tutor',  // PL will use the tutor route
+  PL: '/(tutor)/tutor',
   DEFAULT: '/home'
 };
 
-// Update the API_CONFIG to match your backend port
-// Update API_CONFIG with the correct endpoint for email verification
-// Update API_CONFIG to include debug mode
 const API_CONFIG = {
   BASE_URL: Platform.select({
     web: 'http://localhost:5253/api',
@@ -49,16 +37,40 @@ const API_CONFIG = {
 export default function GoogleSignInScreen() {
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
+  const [rolesLoaded, setRolesLoaded] = useState(false);
+
+  // Fetch roles when component mounts
+  useEffect(() => {
+    const fetchRoles = async () => {
+      try {
+        const response = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.ROLES}`);
+        const roles = await response.json();
+        
+        // Create ROLE_MAP dynamically
+        roles.forEach(role => {
+          ROLE_MAP[role.id] = role.normalizedName;
+        });
+        
+        setRolesLoaded(true);
+      } catch (error) {
+        console.error('Failed to fetch roles:', error);
+        Alert.alert('Error', 'Failed to load role information. Please try again later.');
+      }
+    };
+
+    fetchRoles();
+  }, []);
 
   const validateEmail = (email) => {
     return /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/.test(email);
   };
 
-  // Add Toast import at the top
-// Remove duplicate Toast import since it's already imported at the top
-  
-  // Update handleEmailVerification function
   const handleEmailVerification = async () => {
+    if (!rolesLoaded) {
+      Alert.alert('Error', 'Role information is still loading. Please wait.');
+      return;
+    }
+
     if (!email || !validateEmail(email)) {
       Alert.alert('Error', 'Please enter a valid email address');
       return;
@@ -68,7 +80,6 @@ export default function GoogleSignInScreen() {
       setLoading(true);
       const trimmedEmail = email.toLowerCase().trim();
       
-      // First check staff list
       const staffEndpoint = `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.STAFFS}`;
       const studentEndpoint = `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.STUDENTS}`;
       
@@ -78,11 +89,8 @@ export default function GoogleSignInScreen() {
       const staffMember = staffList.find(staff => staff.email.toLowerCase() === trimmedEmail);
   
       if (staffMember) {
-        //console.log('Staff member raw data:', staffMember);
-        console.log('Staff ID:', staffMember.staff_Id);
         console.log('Staff member data:', {
           roleId: staffMember.role_Id,
-          roleName: staffMember.role?.role_Name
         });
         
         const role = ROLE_MAP[staffMember.role_Id];
@@ -93,7 +101,6 @@ export default function GoogleSignInScreen() {
           return;
         }
   
-        // Store user data with additional information
         const userInfo = {
           id: staffMember.id,
           staffId: staffMember.staff_Id,
@@ -118,10 +125,9 @@ export default function GoogleSignInScreen() {
           visibilityTime: 2000,
         });
   
-        // Updated navigation logic with proper error handling
         setTimeout(() => {
-          console.log('Role before navigation:', role); // Debug log
-          console.log('Available routes:', ROUTES); // Debug log
+          console.log('Role before navigation:', role);
+          console.log('Available routes:', ROUTES);
           
           switch (role) {
             case 'TUTOR':
@@ -149,19 +155,18 @@ export default function GoogleSignInScreen() {
         const student = studentList.find(student => student.email.toLowerCase() === trimmedEmail);
   
         if (student) {
-          // Store student data with department info
           const userInfo = {
             id: student.id,
             studentId: student.student_Id,
             email: student.email,
             name: student.name,
             role: 'STUDENT',
-            department_Id: student.department_Id,  // Keep the exact field name
+            department_Id: student.department_Id,
             departmentName: student.department?.department_Name || 'Department Not Assigned',
             google_Id: student.google_Id,
             phone_No: student.phone_No,
             profile_PictureURL: student.profile_PictureURL,
-            moduleIds: student.moduleIds || []  // Include existing moduleIds
+            moduleIds: student.moduleIds || []
           };
   
           await AsyncStorage.setItem('userData', JSON.stringify(userInfo));
@@ -189,7 +194,6 @@ export default function GoogleSignInScreen() {
     }
   };
 
-  // Add Toast component at the end of your return statement
   return (
     <View style={styles.container}>
       <View style={styles.header}>
@@ -212,12 +216,12 @@ export default function GoogleSignInScreen() {
       </View>
 
       <TouchableOpacity 
-        style={[styles.verifyButton, loading && styles.buttonDisabled]}
+        style={[styles.verifyButton, (loading || !rolesLoaded) && styles.buttonDisabled]}
         onPress={handleEmailVerification}
-        disabled={loading}
+        disabled={loading || !rolesLoaded}
       >
         <Text style={styles.buttonText}>
-          {loading ? 'Verifying...' : 'Verify Email'}
+          {!rolesLoaded ? 'Loading...' : loading ? 'Verifying...' : 'Verify Email'}
         </Text>
       </TouchableOpacity>
       <Toast />

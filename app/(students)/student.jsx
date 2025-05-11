@@ -10,9 +10,9 @@ import { Platform } from 'react-native'; // Add this import at the top
 const API_CONFIG = {
   BASE_URL: Platform.select({
     web: 'http://localhost:5253/api',
-    android: 'http://10.0.2.2:5253/api',
-    ios: 'http://localhost:5253/api',
-    default: 'http://localhost:5253/api'
+    android: 'http://10.2.4.216:5253/api',
+    ios: 'http://10.2.4.216:5253/api',
+    default: 'http://10.2.4.216:5253/api'
   })
 };
 
