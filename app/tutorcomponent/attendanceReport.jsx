@@ -6,14 +6,16 @@ import {
   ScrollView,
   Animated,
   TouchableWithoutFeedback,
-  ActivityIndicator
+  ActivityIndicator,
+  FlatList,
+  Alert
 } from "react-native";
 import Constants from "expo-constants";
 import { useColorScheme } from "nativewind";
-import { BarChart } from "react-native-chart-kit";
+import { BarChart, PieChart } from "react-native-chart-kit";
 import { Dimensions } from "react-native";
-import { useRouter, useLocalSearchParams } from "expo-router"; 
-import Svg, { Circle } from "react-native-svg";
+import { useRouter, useLocalSearchParams } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 
 const screenWidth = Dimensions.get("window").width;
 const API_BASE_URL = Constants.expoConfig.extra.API_BASE_URL;
@@ -32,8 +34,17 @@ export default function AttendanceReport() {
   const [attendanceIssueCount, setAttendanceIssueCount] = useState(0);
   const [availableMonths, setAvailableMonths] = useState([]);
   const [monthlyPresentPercentage, setMonthlyPresentPercentage] = useState([]);
+  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
+  const [pieData, setPieData] = useState([]);
+  const [monthlyAttendanceStatus, setMonthlyAttendanceStatus] = useState({});
+  const [monthDropdownVisible, setMonthDropdownVisible] = useState(false);
+  const monthDropdownOpacity = useRef(new Animated.Value(0)).current;
+  const monthDropdownTranslateY = useRef(new Animated.Value(-10)).current;
 
-  const router = useRouter(); 
+  const router = useRouter();
+
+  const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+  const shortMonthNames = ["Jan", "Feb", "Mar", "Apr", "May", "June", "July", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
   useEffect(() => {
     const fetchAttendanceData = async () => {
@@ -55,46 +66,118 @@ export default function AttendanceReport() {
 
   const processMonthlyData = (records) => {
     if (!records || records.length === 0) return;
-  
-    // Initialize all months with 0 values
-    const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "June", "July", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
     const monthMap = {};
-    
-    // Initialize all months
+    const statusMap = {};
+    const monthsWithData = new Set();
+
     monthNames.forEach(month => {
       monthMap[month] = {
         present: 0,
         total: 0
       };
+      
+      statusMap[month] = {
+        present: 0,
+        absent: 0,
+        leave: 0,
+        total: 0
+      };
     });
-  
-    // Populate with actual data
+
     records.forEach(record => {
       const date = new Date(record.date);
-      const month = date.getMonth(); // 0-11
+      const month = date.getMonth();
       const monthName = monthNames[month];
+      monthsWithData.add(monthName);
       
       record.students.forEach(student => {
         monthMap[monthName].total++;
-        if (student.status === 0) { // Only count as present if status is 0
+        statusMap[monthName].total++;
+        
+        if (student.status === 0) {
           monthMap[monthName].present++;
+          statusMap[monthName].present++;
+        } else if (student.status === 1) {
+          statusMap[monthName].absent++;
+        } else if (student.status === 2) {
+          statusMap[monthName].leave++;
         }
       });
     });
-  
-    // Prepare data for chart
-    const months = monthNames; // Show all months
-    const percentages = months.map(month => {
+
+    const months = Array.from(monthsWithData);
+    const percentages = monthNames.map(month => {
       if (monthMap[month].total > 0) {
         const percentage = (monthMap[month].present / monthMap[month].total) * 100;
         return Math.round(percentage);
       }
-      return 0; // Return 0 if no data for the month
+      return 0;
     });
-  
-    console.log("All months data:", monthMap);
+
+    setMonthlyAttendanceStatus(statusMap);
+    const firstAvailableMonth = months.length > 0 ? monthNames.indexOf(months[0]) : new Date().getMonth();
+    setSelectedMonth(firstAvailableMonth);
+    updatePieData(statusMap[monthNames[firstAvailableMonth]]);
     setAvailableMonths(months);
     setMonthlyPresentPercentage(percentages);
+  };
+  
+  const updatePieData = (monthData) => {
+    if (!monthData || monthData.total === 0) {
+      setPieData([
+        { 
+          name: 'Present (0%)', 
+          population: 0, 
+          color: '#4CAF50', 
+          legendFontColor: colorScheme === "dark" ? "#ffffff" : "#000000", 
+          legendFontSize: 12 
+        },
+        { 
+          name: 'Absent (0%)', 
+          population: 0, 
+          color: '#F44336', 
+          legendFontColor: colorScheme === "dark" ? "#ffffff" : "#000000", 
+          legendFontSize: 12 
+        },
+        { 
+          name: 'Leave (0%)', 
+          population: 0, 
+          color: '#FFC107', 
+          legendFontColor: colorScheme === "dark" ? "#ffffff" : "#000000", 
+          legendFontSize: 12 
+        }
+      ]);
+      return;
+    }
+    
+    const presentPercentage = (monthData.present / monthData.total) * 100;
+    const absentPercentage = (monthData.absent / monthData.total) * 100;
+    const leavePercentage = (monthData.leave / monthData.total) * 100;
+    
+    setPieData([
+      { 
+        name: `% Present`, 
+        population: Math.round(presentPercentage), 
+        color: '#28db71', 
+        legendFontColor: colorScheme === "dark" ? "#ffffff" : "#000000", 
+        legendFontSize: 12 
+      },
+      { 
+        name: `% Absent`, 
+        population: Math.round(absentPercentage), 
+        color: '#ff6565', 
+        legendFontColor: colorScheme === "dark" ? "#ffffff" : "#000000", 
+        legendFontSize: 12 
+      },
+      { 
+        name: `% Leave`, 
+        population: Math.round(leavePercentage), 
+        color: '#3290ff', 
+        legendFontColor: colorScheme === "dark" ? "#ffffff" : "#000000", 
+        legendFontSize: 12 
+      }
+    ]);
   };
 
   const calculateAttendanceStats = (records) => {
@@ -103,10 +186,9 @@ export default function AttendanceReport() {
       setAttendanceIssueCount(0);
       return;
     }
-  
+
     const studentAttendanceMap = new Map();
-  
-    // Process all records across all months
+
     records.forEach(record => {
       record.students.forEach(student => {
         if (!studentAttendanceMap.has(student.studentId)) {
@@ -117,9 +199,9 @@ export default function AttendanceReport() {
             leaveCount: 0,
           });
         }
-  
+
         const studentRecord = studentAttendanceMap.get(student.studentId);
-  
+
         if (student.status === 0) {
           studentRecord.presentCount++;
           studentRecord.totalCount++;
@@ -130,37 +212,41 @@ export default function AttendanceReport() {
         }
       });
     });
-  
+
     let noIssueCount = 0;
     let issueCount = 0;
-  
+
     studentAttendanceMap.forEach(student => {
       const effectiveTotal = student.totalCount + student.leaveCount;
       const attendancePercentage = (student.presentCount / effectiveTotal) * 100;
-  
-      // Apply different threshold if the student has leave
+
       const threshold = student.leaveCount > 0 ? 80 : 90;
-  
+
       if (attendancePercentage >= threshold) {
         noIssueCount++;
       } else {
         issueCount++;
       }
     });
-  
+
     setNoAttendanceIssueCount(noIssueCount);
     setAttendanceIssueCount(issueCount);
   };
-  
+
+  const toggleMonthDropdown = () => {
+    setMonthDropdownVisible(!monthDropdownVisible);
+  };
+
+  const selectMonth = (monthIndex) => {
+    setSelectedMonth(monthIndex);
+    updatePieData(monthlyAttendanceStatus[monthNames[monthIndex]]);
+    setMonthDropdownVisible(false);
+  };
 
   const totalAttendance = noAttendanceIssueCount + attendanceIssueCount;
-  const noAttendanceIssuePercentage = totalAttendance > 0 
-    ? (noAttendanceIssueCount / totalAttendance) * 100 
+  const noAttendanceIssuePercentage = totalAttendance > 0
+    ? (noAttendanceIssueCount / totalAttendance) * 100
     : 0;
-
-  const radius = 30;
-  const strokeWidth = 15;
-  const circumference = 2 * Math.PI * radius;
 
   const chartConfig = {
     backgroundGradientFrom: colorScheme === "dark" ? "#1e293b" : "#ffffff",
@@ -171,9 +257,8 @@ export default function AttendanceReport() {
     useShadowColorFromDataset: false,
   };
 
-  // Monthly Data showing all months
   const monthlyData = {
-    labels: availableMonths,
+    labels: shortMonthNames,
     datasets: [
       {
         data: monthlyPresentPercentage,
@@ -229,6 +314,10 @@ export default function AttendanceReport() {
         }),
       ]).start(() => setAllModulesViewOptionsVisible(false));
     }
+    
+    if (monthDropdownVisible) {
+      setMonthDropdownVisible(false);
+    }
   };
 
   if (loading) {
@@ -244,71 +333,98 @@ export default function AttendanceReport() {
       <ScrollView
         className={`flex-1 p-4 ${colorScheme === "dark" ? "bg-gray-900" : "bg-white"}`}
       >
-        <Text className={`text-xl font-bold mb-2 ${colorScheme === "dark" ? "text-gray-400" : "text-black"}`}>
-          Report Analysis
-        </Text>
-
-        {/* Report Analysis Section */}
         <View
-          className={`p-4 rounded-lg shadow-md mb-6 items-center w-full ${colorScheme === "dark" ? "bg-gray-800" : "bg-gray-100"}`}
-          style={{ paddingLeft: 10 }}
+          className={`p-4 rounded-lg shadow-md mb-6 ${colorScheme === "dark" ? "bg-gray-800" : "bg-gray-100"}`}
         >
-          <View className="flex-row justify-between items-center">
-            <View className="items-center">
-              <Svg width={150} height={150} viewBox="0 0 100 100">
-                <Circle
-                  cx="50"
-                  cy="50"
-                  r={radius}
-                  stroke="#E9D5FF"
-                  strokeWidth={strokeWidth}
-                  fill="none"
-                />
-                <Circle
-                  cx="50"
-                  cy="50"
-                  r={radius}
-                  stroke="#7C3AED"
-                  strokeWidth={strokeWidth}
-                  fill="none"
-                  strokeDasharray={`${(noAttendanceIssuePercentage / 100) * circumference} ${circumference}`}
-                  strokeLinecap="round"
-                  transform="rotate(-90 50 50)"
-                />
-              </Svg>
-            </View>
-            <View>
-              <View className="flex-row items-center gap-x-2 mb-5">
-                <Text className={`text-base ${colorScheme === "dark" ? "text-gray-400" : "text-black"}`}>No attendance Issue</Text>
-                <Text className={`text-base font-semibold ${colorScheme === "dark" ? "text-gray-400" : "text-black"}`}>
-                  {noAttendanceIssueCount} 
+          <View className="flex-row items-center justify-between mb-5">
+            <TouchableOpacity onPress={() => setMonthDropdownVisible(false)} className="mr-2">
+              <Text className={`text-lg font-semibold ${colorScheme === "dark" ? "text-gray-400" : "text-black"}`}>
+              Attendance Distribution
+            </Text>
+            </TouchableOpacity>
+
+            <View className="relative flex-1">
+              <TouchableOpacity
+                className={`flex-row items-center justify-between border rounded-[10px] p-3 ${
+                  colorScheme === "dark" ? "border-gray-300" : "border-gray-300"
+                }`}
+                onPress={toggleMonthDropdown}
+              >
+                <Text
+                  style={{ color: colorScheme === "dark" ? "#D1D5DB" : "#000" }}
+                >
+                  {monthNames[selectedMonth] || "Select Month"}
                 </Text>
-              </View>
-              <View className="flex-row items-center gap-x-2">
-                <Text className={`text-base ${colorScheme === "dark" ? "text-gray-400" : "text-black"}`}>Attendance Issue</Text>
-                <Text className={`text-base font-semibold ${colorScheme === "dark" ? "text-gray-400" : "text-black"}`}>
-                  {attendanceIssueCount} 
-                </Text>
-              </View>
+                <Ionicons
+                  name={monthDropdownVisible ? "chevron-up" : "chevron-down"}
+                  size={16}
+                  color={colorScheme === "dark" ? "#D1D5DB" : "#000"}
+                  className="ml-2"
+                />
+              </TouchableOpacity>
+              {monthDropdownVisible && (
+                <View
+                  className={`absolute top-12 left-0 right-0 border border-gray-200 rounded-[10px] ${
+                    colorScheme === "dark" ? "bg-gray-700" : "bg-white"
+                  } max-h-48 z-10 shadow-md`}
+                >
+                  <FlatList
+                    data={availableMonths}
+                    keyExtractor={(item) => item}
+                    className="rounded-[10px] overflow-hidden"
+                    renderItem={({ item }) => (
+                      <TouchableOpacity
+                        className={`p-3 border-b ${
+                          colorScheme === "dark"
+                            ? "border-gray-500"
+                            : "border-gray-200"
+                        }`}
+                        onPress={() => selectMonth(monthNames.indexOf(item))}
+                      >
+                        <Text
+                          style={{
+                            color: colorScheme === "dark" ? "#D1D5DB" : "#000",
+                          }}
+                        >
+                          {item}
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+                  />
+                </View>
+              )}
             </View>
+          </View>
+          
+          <View style={{ height: 220, width: '100%', alignItems: 'center' }}>
+            {pieData.length > 0 && (
+              <PieChart
+                data={pieData}
+                width={screenWidth * 0.85}
+                height={200}
+                chartConfig={chartConfig}
+                accessor="population"
+                backgroundColor="transparent"
+                paddingLeft="15"
+                absolute
+              />
+            )}
           </View>
         </View>
 
-        {/* Students Present Percentage */}
         <View className="flex-row justify-between items-center mb-4">
           <Text className={`text-lg font-semibold ${colorScheme === "dark" ? "text-gray-400" : "text-black"}`}>
             Monthly Present Percentage
           </Text>
         </View>
 
-        {/* Scrollable Bar Chart */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
           <View 
             className={`p-4 rounded-lg shadow-md items-center w-full ${colorScheme === "dark" ? "bg-gray-800" : "bg-gray-100"}`}
           >
             <BarChart
               data={monthlyData}
-              width={screenWidth * 1.5} // Adjusted width to fit all months
+              width={screenWidth * 1.5}
               height={220}
               yAxisSuffix="%"
               chartConfig={chartConfig}
@@ -321,7 +437,6 @@ export default function AttendanceReport() {
 
         <View style={{ flex: 1 }} />
 
-        {/* Student Report Section with Dropdown */}
         <View 
           className={`p-4 rounded-[10px] shadow-md w-full mt-5 ${colorScheme === "dark" ? "bg-gray-800" : "bg-purple-100"}`}
         >
