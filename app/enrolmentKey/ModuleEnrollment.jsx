@@ -7,9 +7,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 const API_CONFIG = {
   BASE_URL: Platform.select({
     web: 'http://localhost:5253/api',
-    android: 'http://10.0.2.2:5253/api',
-    ios: 'http://localhost:5253/api',
-    default: 'http://localhost:5253/api'
+    android: 'http://10.2.5.57:5253/api',
+    ios: 'http://10.2.23.163:5253/api',
+    default: 'http://10.2.5.57:5253/api'
   }),
   ENDPOINTS: {
     CLASSES: '/Classes',

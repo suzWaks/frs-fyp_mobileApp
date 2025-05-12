@@ -1,39 +1,37 @@
-// Move these to the top with other imports
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, Dimensions, KeyboardAvoidingView, Platform, Animated, Easing } from 'react-native';
 import React, { useState, useEffect } from 'react';
 import { Link, router } from 'expo-router';
 import { MaterialIcons, Ionicons, FontAwesome, Feather } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
+import Toast from 'react-native-toast-message';
 
-// Add this right after the imports and before any other code
 const { width, height } = Dimensions.get('window');
 const isSmallDevice = width < 375;
 
+// Get API base URL from expo constants
+const API_BASE_URL = 'http://10.2.5.57:5253/api';
+
+
 // Configuration
-// Update API_CONFIG to use HTTP instead of HTTPS
 const API_CONFIG = {
-  BASE_URL: Constants.expoConfig?.extra?.API_BASE_URL || 'http://10.0.2.2:5253/api',  // Updated for Android emulator
+  BASE_URL: API_BASE_URL,
   ENDPOINTS: {
+    LOGIN: '/login',
     STAFFS: '/Staffs',
-    STUDENTS: '/Students'
+    STUDENTS: '/Students',
+    ROLES: '/Roles'
   }
 };
 
-// Add logging to debug API calls
-// Add these constants after API_CONFIG
-const ROLE_MAP = {
-  1: 'TUTOR',
-  2: 'DAA',
-  3: 'ADMIN',
-  4: 'STUDENT'
-};
+let ROLE_MAP = {};
 
 const ROUTES = {
   ADMIN: '/admin/dashboard',
   TUTOR: '/(tutor)/tutor',
-  STUDENT: '/(students)/student',
+  STUDENT: '/facialonboardings/onboardingscreen',
   DAA: '/(tabs)/home',
+  PL: '/(tutor)/tutor',
   DEFAULT: '/home'
 };
 
@@ -45,8 +43,30 @@ export default function SignInScreen() {
   const [loading, setLoading] = useState(false);
   const [fadeAnim] = useState(new Animated.Value(0));
   const [slideAnim] = useState(new Animated.Value(height * 0.1));
-  
-  // Add useEffect for animation
+  const [rolesLoaded, setRolesLoaded] = useState(false);
+
+  // Fetch roles when component mounts
+  useEffect(() => {
+    const fetchRoles = async () => {
+      try {
+        const response = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.ROLES}`);
+        const roles = await response.json();
+        
+        // Create ROLE_MAP dynamically
+        roles.forEach(role => {
+          ROLE_MAP[role.id] = role.normalizedName;
+        });
+        
+        setRolesLoaded(true);
+      } catch (error) {
+        console.error('Failed to fetch roles:', error);
+        Alert.alert('Error', 'Failed to load role information. Please try again later.');
+      }
+    };
+
+    fetchRoles();
+  }, []);
+
   useEffect(() => {
     Animated.parallel([
       Animated.timing(fadeAnim, {
@@ -62,8 +82,7 @@ export default function SignInScreen() {
       })
     ]).start();
   }, []);
-  
-  // Move these functions inside the component
+
   const handleGoogleSignIn = async () => {
     try {
       router.push('/google-signin');
@@ -72,7 +91,7 @@ export default function SignInScreen() {
       Alert.alert('Error', 'Failed to initiate Google Sign In');
     }
   };
-  
+
   const validateInputs = () => {
     if (!email || !password) {
       Alert.alert('Error', 'Please enter both email and password');
@@ -84,124 +103,162 @@ export default function SignInScreen() {
       return false;
     }
 
+    if (password.length < 6) {
+      Alert.alert('Error', 'Password must be at least 6 characters');
+      return false;
+    }
+
     return true;
   };
 
-  const handleLogin = async () => {
-    if (!validateInputs()) return;
-  
-    try {
-      setLoading(true);
-      const trimmedEmail = email.toLowerCase().trim();
-      
-      console.log('Attempting to connect to:', `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.STAFFS}`);
+ const handleLogin = async () => {
+  if (!validateInputs()) return;
+  if (!rolesLoaded) {
+    Alert.alert('Error', 'Role information is still loading. Please wait.');
+    return;
+  }
 
-      // First, try staff endpoint
-      let response = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.STAFFS}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email: trimmedEmail, password })
-      });
+  try {
+    setLoading(true);
+    const trimmedEmail = email.toLowerCase().trim();
+    
+    // First authenticate with the login endpoint
+    const loginResponse = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.LOGIN}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ 
+        email: trimmedEmail, 
+        password 
+      })
+    });
 
-      console.log('Staff endpoint response status:', response.status);
-      // If not found in staff, try student endpoint
-      if (!response.ok) {
-        response = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.STUDENTS}`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ email: trimmedEmail, password })
-        });
-      }
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Authentication failed');
-      }
-
-      const data = await response.json();
-      await handleSuccessfulLogin(data);
-    } catch (error) {
-      handleLoginError(error);
-    } finally {
-      setLoading(false);
+    if (!loginResponse.ok) {
+      throw new Error('Invalid email or password');
     }
-  };
 
-  const handleSuccessfulLogin = async (data) => {
-    try {
-      // Handle both data structures (Google sign-in and regular sign-in)
-      const user = data.user || data;
-      const token = data.token || null;
+    const loginData = await loginResponse.json();
+    const token = loginData.token;
+
+    // Now find the user's role by checking staff and student endpoints
+    const staffEndpoint = `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.STAFFS}`;
+    const studentEndpoint = `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.STUDENTS}`;
+    
+    // Check staff first
+    const staffResponse = await fetch(staffEndpoint);
+    const staffList = await staffResponse.json();
+    const staffMember = staffList.find(staff => staff.email.toLowerCase() === trimmedEmail);
+
+    if (staffMember) {
+      const role = ROLE_MAP[staffMember.role_Id];
       
-      // Get role name from either role_Id or existing role
-      let roleName;
-      if (user.role_Id) {
-        roleName = ROLE_MAP[user.role_Id];
-        console.log('Role mapped from role_Id:', roleName);
-      } else {
-        roleName = user.role?.toUpperCase();
-        console.log('Role from user object:', roleName);
+      if (!role) {
+        throw new Error('Invalid role assignment. Please contact administrator.');
       }
-  
-      if (!roleName) {
-        throw new Error('Invalid role assignment');
-      }
-  
-      const userData = {
-        id: user.staff_Id || user.id,
-        email: user.email,
-        role: roleName,
-        name: user.name,
-        departmentId: user.department_Id || user.departmentId,
-        token
+
+      const userInfo = {
+        id: staffMember.id,
+        staffId: staffMember.staff_Id,
+        email: staffMember.email,
+        name: staffMember.name,
+        role: role,
+        departmentId: staffMember.department_Id,
+        departmentName: staffMember.department?.department_Name || 'Department Not Assigned',
+        token: token,
+        phoneNo: staffMember.phone_No,
+        profilePicture: staffMember.profile_PictureURL,
+        classes: staffMember.classes || []
       };
-  
-      console.log('Storing user data:', userData);
-      
-      // Store user data based on authentication type
-      if (rememberMe || !token) {
-        await AsyncStorage.setItem('userData', JSON.stringify(userData));
-      } else {
-        await AsyncStorage.setItem('authToken', token);
-      }
-  
-      const route = ROUTES[roleName];
-      console.log('Navigating to route:', route);
-  
-      Alert.alert('Success', `Welcome ${userData.name}`, [
-        {
-          text: 'OK',
-          onPress: () => router.replace(route)
-        }
-      ]);
-    } catch (error) {
-      console.error('Login success handling error:', error);
-      Alert.alert('Error', 'Failed to process login. Please try again.');
-    }
-  };
 
-  const handleLoginError = (error) => {
-    console.error('Sign in error:', error);
-    let errorMessage = 'An error occurred during sign in';
-    
-    if (error.message.includes('Network request failed')) {
-      errorMessage = 'Network error. Please check your connection.';
-    } else if (error.message) {
-      errorMessage = error.message;
+      await handleUserLoginSuccess(userInfo);
+    } else {
+      // If not staff, check student list
+      const studentResponse = await fetch(studentEndpoint);
+      const studentList = await studentResponse.json();
+      const student = studentList.find(student => student.email.toLowerCase() === trimmedEmail);
+
+      if (student) {
+        const userInfo = {
+          id: student.id,
+          studentId: student.student_Id,
+          email: student.email,
+          name: student.name,
+          role: 'STUDENT',
+          departmentId: student.department_Id,
+          departmentName: student.department?.department_Name || 'Department Not Assigned',
+          token: token,
+          phoneNo: student.phone_No,
+          profilePicture: student.profile_PictureURL,
+          moduleIds: student.moduleIds || []
+        };
+
+        await handleUserLoginSuccess(userInfo);
+      } else {
+        throw new Error('Email not found in our records');
+      }
     }
-    
-    Alert.alert('Error', errorMessage);
-  };
+  } catch (error) {
+    console.error('Login error:', error);
+    Toast.show({
+      type: 'error',
+      text1: 'Login Failed',
+      text2: error.message || 'Invalid credentials',
+      position: 'bottom',
+      visibilityTime: 3000,
+    });
+  } finally {
+    setLoading(false);
+  }
+};
+
+const handleUserLoginSuccess = async (userInfo) => {
+  // Store user data based on remember me preference
+  if (rememberMe) {
+    await AsyncStorage.setItem('userData', JSON.stringify(userInfo));
+  }
+  // if (userInfo.token) {
+  //   await AsyncStorage.setItem('authToken', userInfo.token);
+  // }
+
+  Toast.show({
+    type: 'success',
+    text1: 'Login Successful',
+    text2: `Welcome ${userInfo.name}`,
+    position: 'bottom',
+    visibilityTime: 2000,
+  });
+
+  setTimeout(() => {
+    switch (userInfo.role) {
+      case 'ADMIN':
+        router.replace(ROUTES.ADMIN);
+        break;
+      case 'TUTOR':
+      case 'PL':
+        router.replace(ROUTES.TUTOR);
+        break;
+      case 'DAA':
+        router.replace(ROUTES.DAA);
+        break;
+      case 'STUDENT':
+        router.replace(ROUTES.STUDENT);
+        break;
+      default:
+        console.error('Invalid role:', userInfo.role);
+        router.replace(ROUTES.DEFAULT);
+    }
+  }, 2000);
+};
 
   const toggleRememberMe = () => {
     setRememberMe(!rememberMe);
   };
-  
-  // Return statement should be inside the component
+
+  const toggleSecureText = () => {
+    setSecureText(!secureText);
+  };
+
   return (
     <KeyboardAvoidingView 
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'} 
@@ -261,10 +318,7 @@ export default function SignInScreen() {
             autoComplete="password"
             textContentType="password"
           />
-          <TouchableOpacity 
-            onPress={() => setSecureText(!secureText)}
-            activeOpacity={0.7}
-          >
+          <TouchableOpacity onPress={toggleSecureText}>
             <Ionicons 
               name={secureText ? "eye-off" : "eye"} 
               size={isSmallDevice ? 20 : 24} 
@@ -295,13 +349,13 @@ export default function SignInScreen() {
     
         {/* Sign In Button */}
         <TouchableOpacity 
-          style={[styles.signInButton, loading && styles.buttonDisabled]}
+          style={[styles.signInButton, (loading || !rolesLoaded) && styles.buttonDisabled]}
           onPress={handleLogin}
-          disabled={loading}
+          disabled={loading || !rolesLoaded}
           activeOpacity={0.8}
         >
           <Text style={styles.signInButtonText}>
-            {loading ? 'Signing In...' : 'Sign In'}
+            {!rolesLoaded ? 'Loading...' : loading ? 'Signing In...' : 'Sign In'}
           </Text>
         </TouchableOpacity>
     
@@ -332,6 +386,8 @@ export default function SignInScreen() {
           <Text style={styles.footerText}>Don't have an account?</Text>
           <Link href="/admininfo" style={styles.link}>Contact Admin</Link>
         </View>
+        
+        <Toast />
       </Animated.View>
     </KeyboardAvoidingView>
   );

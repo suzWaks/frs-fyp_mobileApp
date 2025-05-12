@@ -26,9 +26,9 @@ export default function ModuleDetailScreen() {
 
   // API configuration
   const API_BASE_URL = Platform.select({
-    android: 'http://10.0.2.2:5253',
+    android: 'http://10.2.5.57:5253/api',
     ios: 'http://localhost:5253',
-    default: 'http://localhost:5253',
+    default: 'http://10.2.5.57:5253/api',
   });
 
   useEffect(() => {

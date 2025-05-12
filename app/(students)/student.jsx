@@ -10,9 +10,9 @@ import { Platform } from 'react-native'; // Add this import at the top
 const API_CONFIG = {
   BASE_URL: Platform.select({
     web: 'http://localhost:5253/api',
-    android: 'http://10.0.2.2:5253/api',
+    android: 'http://10.2.23.83:5253/api',
     ios: 'http://localhost:5253/api',
-    default: 'http://localhost:5253/api'
+    default: 'http://10.2.23.83:5253/api'
   })
 };
 
@@ -76,8 +76,19 @@ export default function StudentScreen() {
     }, [])
   );
 
-  const handlePlusIconPress = () => {
-    router.push('/department/student');
+  const handlePlusIconPress = async () => {
+    const userData = await AsyncStorage.getItem('userData');
+    if (userData) {
+      const parsedUserData = JSON.parse(userData);
+      console.log('Student Data being passed:', parsedUserData); // Add this log
+      router.push({
+        pathname: '/department/studentname',
+        params: { 
+          studentId: parsedUserData.id,
+          studentData: JSON.stringify(parsedUserData)  // Make sure to stringify the data
+        }
+      });
+    }
   };
 
   const handleProfileIconPress = () => {
