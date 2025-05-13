@@ -10,7 +10,7 @@ const { width, height } = Dimensions.get('window');
 const isSmallDevice = width < 375;
 
 // Get API base URL from expo constants
-const API_BASE_URL = 'http://10.2.5.57:5253/api';
+const API_BASE_URL = 'http://10.2.23.104:5253/api';
 
 
 // Configuration

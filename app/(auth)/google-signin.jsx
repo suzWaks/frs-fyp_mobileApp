@@ -1,5 +1,5 @@
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, Dimensions, Platform } from 'react-native';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { router } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -8,36 +8,24 @@ import Toast from 'react-native-toast-message';
 
 const { width, height } = Dimensions.get('window');
 
-// Update the API_CONFIG to use the configuration from app.json
-// Add ROLE_MAP and ROUTES constants
-// Update the ROLE_MAP to match the schema where role_Id starts from 0
-// Update the ROLE_MAP to match the actual role IDs from the backend
-const ROLE_MAP = {
-  1: 'ADMIN',
-  2: 'DAA',
-  3: 'PL',
-  4: 'TUTOR',
-  5: 'STUDENT'
-};
+// Initialize ROLE_MAP as empty object, will be populated after fetching roles
+let ROLE_MAP = {};
 
 const ROUTES = {
   ADMIN: '/admin/dashboard',
   TUTOR: '/(tutor)/tutor',
   STUDENT: '/(students)/student',
   DAA: '/(tabs)/home',
-  PL: '/(tutor)/tutor',  
+  PL: '/(tutor)/tutor',
   DEFAULT: '/home'
 };
 
-// Update the API_CONFIG to match your backend port
-// Update API_CONFIG with the correct endpoint for email verification
-// Update API_CONFIG to include debug mode
 const API_CONFIG = {
   BASE_URL: Platform.select({
     web: 'http://localhost:5253/api',
-    android: 'http://10.2.5.57:5253/api',  // Fixed missing port number
-    ios: 'http://localhost:5253/api',
-    default: 'http://10.2.5.57:5253/api'
+    android: 'http://10.2.23.104:5253/api',
+    ios: 'http://10.2.4.216:5253/api',
+    default: 'http://10.2.23.104:5253/api'
   }),
   ENDPOINTS: {
     STAFFS: '/Staffs',
@@ -49,17 +37,40 @@ const API_CONFIG = {
 export default function GoogleSignInScreen() {
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
-  const [verificationStep, setVerificationStep] = useState('idle'); // Add this state
+  const [rolesLoaded, setRolesLoaded] = useState(false);
+
+  // Fetch roles when component mounts
+  useEffect(() => {
+    const fetchRoles = async () => {
+      try {
+        const response = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.ROLES}`);
+        const roles = await response.json();
+        
+        // Create ROLE_MAP dynamically
+        roles.forEach(role => {
+          ROLE_MAP[role.id] = role.normalizedName;
+        });
+        
+        setRolesLoaded(true);
+      } catch (error) {
+        console.error('Failed to fetch roles:', error);
+        Alert.alert('Error', 'Failed to load role information. Please try again later.');
+      }
+    };
+
+    fetchRoles();
+  }, []);
 
   const validateEmail = (email) => {
     return /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/.test(email);
   };
 
-  // Add Toast import at the top
-// Remove duplicate Toast import since it's already imported at the top
-  
-  // Update handleEmailVerification function
   const handleEmailVerification = async () => {
+    if (!rolesLoaded) {
+      Alert.alert('Error', 'Role information is still loading. Please wait.');
+      return;
+    }
+
     if (!email || !validateEmail(email)) {
       Alert.alert('Error', 'Please enter a valid email address');
       return;
@@ -67,44 +78,45 @@ export default function GoogleSignInScreen() {
   
     try {
       setLoading(true);
-      setVerificationStep('checking');
       const trimmedEmail = email.toLowerCase().trim();
       
-      Toast.show({
-        type: 'info',
-        text1: 'Verifying Email',
-        text2: 'Please wait while we verify your credentials...',
-        position: 'bottom',
-        visibilityTime: 2000,
-      });
-
       const staffEndpoint = `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.STAFFS}`;
       const studentEndpoint = `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.STUDENTS}`;
       
-      // Check student records first
-      setVerificationStep('checking_student');
-      const studentResponse = await fetch(studentEndpoint);
-      const studentList = await studentResponse.json();
-      const student = studentList.find(student => student.email.toLowerCase() === trimmedEmail);
-
-      if (student) {
-        setVerificationStep('student_found');
+      // Check staff first
+      const staffResponse = await fetch(staffEndpoint);
+      const staffList = await staffResponse.json();
+      const staffMember = staffList.find(staff => staff.email.toLowerCase() === trimmedEmail);
+  
+      if (staffMember) {
+        console.log('Staff member data:', {
+          roleId: staffMember.role_Id,
+        });
+        
+        const role = ROLE_MAP[staffMember.role_Id];
+        console.log('Mapped role:', role);
+        
+        if (!role) {
+          Alert.alert('Error', 'Invalid role assignment. Please contact administrator.');
+          return;
+        }
+  
         const userInfo = {
-          id: student.id,
-          studentId: student.student_Id,
-          email: student.email,
-          name: student.name,
-          role: 'STUDENT',
-          department_Id: student.department_Id,
-          departmentName: student.department?.department_Name || 'Department Not Assigned',
-          google_Id: student.google_Id,
-          phone_No: student.phone_No,
-          profile_PictureURL: student.profile_PictureURL,
-          moduleIds: student.moduleIds || []
+          id: staffMember.id,
+          staffId: staffMember.staff_Id,
+          email: staffMember.email,
+          name: staffMember.name,
+          role: role,
+          departmentId: staffMember.department_Id,
+          departmentName: staffMember.department.department_Name,
+          googleId: staffMember.google_Id,
+          phoneNo: staffMember.phone_No,
+          profilePicture: staffMember.profile_PictureURL,
+          classes: staffMember.classes
         };
-
+  
         await AsyncStorage.setItem('userData', JSON.stringify(userInfo));
-
+  
         Toast.show({
           type: 'success',
           text1: 'Email Verified',
@@ -112,58 +124,53 @@ export default function GoogleSignInScreen() {
           position: 'bottom',
           visibilityTime: 2000,
         });
-
-        setVerificationStep('redirecting');
-        Toast.show({
-          type: 'info',
-          text1: 'Redirecting',
-          text2: 'Please wait while we prepare your dashboard...',
-          position: 'bottom',
-          visibilityTime: 2000,
-        });
-
+  
         setTimeout(() => {
-          router.replace('/facialonboardings/onboardingscreen');
-        }, 2000);
-      } else {
-        // If not found in students, check staff
-        setVerificationStep('checking_staff');
-        const staffResponse = await fetch(staffEndpoint);
-        const staffList = await staffResponse.json();
-        const staffMember = staffList.find(staff => staff.email.toLowerCase() === trimmedEmail);
-
-        if (staffMember) {
-          setVerificationStep('staff_found');
-          console.log('Staff member data:', {
-            roleId: staffMember.role_Id,
-            roleName: staffMember.role?.role_Name
-          });
+          console.log('Role before navigation:', role);
+          console.log('Available routes:', ROUTES);
           
-          const role = ROLE_MAP[staffMember.role_Id];
-          console.log('Mapped role:', role);
-          
-          if (!role) {
-            Alert.alert('Error', 'Invalid role assignment. Please contact administrator.');
-            return;
+          switch (role) {
+            case 'TUTOR':
+              router.replace('/(tutor)/tutor');
+              break;
+            case 'DAA':
+              router.replace('/(tabs)/home');
+              break;
+            case 'ADMIN':
+              router.replace('/admin/dashboard');
+              break;
+            case 'STUDENT':
+              router.replace('/(students)/student');
+              break;
+            default:
+              console.error('Invalid role:', role);
+              Alert.alert('Error', 'Invalid role configuration');
           }
-    
-          // Store user data with additional information
+        }, 2000);
+  
+      } else {
+        // If not staff, check student list
+        const studentResponse = await fetch(studentEndpoint);
+        const studentList = await studentResponse.json();
+        const student = studentList.find(student => student.email.toLowerCase() === trimmedEmail);
+  
+        if (student) {
           const userInfo = {
-            id: staffMember.id,
-            staffId: staffMember.staff_Id,
-            email: staffMember.email,
-            name: staffMember.name,
-            role: role,
-            departmentId: staffMember.department_Id,
-            departmentName: staffMember.department.department_Name,
-            googleId: staffMember.google_Id,
-            phoneNo: staffMember.phone_No,
-            profilePicture: staffMember.profile_PictureURL,
-            classes: staffMember.classes
+            id: student.id,
+            studentId: student.student_Id,
+            email: student.email,
+            name: student.name,
+            role: 'STUDENT',
+            department_Id: student.department_Id,
+            departmentName: student.department?.department_Name || 'Department Not Assigned',
+            google_Id: student.google_Id,
+            phone_No: student.phone_No,
+            profile_PictureURL: student.profile_PictureURL,
+            moduleIds: student.moduleIds || []
           };
-    
+  
           await AsyncStorage.setItem('userData', JSON.stringify(userInfo));
-    
+  
           Toast.show({
             type: 'success',
             text1: 'Email Verified',
@@ -171,114 +178,19 @@ export default function GoogleSignInScreen() {
             position: 'bottom',
             visibilityTime: 2000,
           });
-    
-          // Add loading message before navigation
-          setVerificationStep('redirecting');
-          Toast.show({
-            type: 'info',
-            text1: 'Redirecting',
-            text2: 'Please wait while we prepare your dashboard...',
-            position: 'bottom',
-            visibilityTime: 2000,
-          });
-    
+  
           setTimeout(() => {
-            console.log('Role before navigation:', role); // Debug log
-            console.log('Available routes:', ROUTES); // Debug log
-            
-            switch (role) {
-              case 'TUTOR':
-                router.replace('/(tutor)/tutor');
-                break;
-              case 'DAA':
-                router.replace('/(tabs)/home');
-                break;
-              case 'ADMIN':
-                router.replace('/admin/dashboard');
-                break;
-              case 'STUDENT':
-                router.replace('/facialonboardings/onboardingscreen');
-                break;
-              default:
-                console.error('Invalid role:', role);
-                Alert.alert('Error', 'Invalid role configuration');
-            }
+            router.replace('/(students)/student');
           }, 2000);
-    
         } else {
-          setVerificationStep('checking_student');
-          const studentResponse = await fetch(studentEndpoint);
-          const studentList = await studentResponse.json();
-          const student = studentList.find(student => student.email.toLowerCase() === trimmedEmail);
-    
-          if (student) {
-            setVerificationStep('student_found');
-            // Store student data with department info
-            const userInfo = {
-              id: student.id,  // Make sure this is included
-              studentId: student.student_Id,
-              email: student.email,
-              name: student.name,
-              role: 'STUDENT',
-              department_Id: student.department_Id,
-              departmentName: student.department?.department_Name || 'Department Not Assigned',
-              google_Id: student.google_Id,
-              phone_No: student.phone_No,
-              profile_PictureURL: student.profile_PictureURL,
-              moduleIds: student.moduleIds || []
-            };
-    
-            await AsyncStorage.setItem('userData', JSON.stringify(userInfo));
-    
-            Toast.show({
-              type: 'success',
-              text1: 'Email Verified',
-              text2: `Welcome ${userInfo.name} from ${userInfo.departmentName}`,
-              position: 'bottom',
-              visibilityTime: 2000,
-            });
-    
-            setVerificationStep('redirecting');
-            Toast.show({
-              type: 'info',
-              text1: 'Redirecting',
-              text2: 'Please wait while we prepare your dashboard...',
-              position: 'bottom',
-              visibilityTime: 2000,
-            });
-    
-            setTimeout(() => {
-              router.replace('/facialonboardings/onboardingscreen');
-            }, 2000);
-          } else {
-            setVerificationStep('not_found');
-            Alert.alert('Error', 'Email not found in our records');
-          }
+          Alert.alert('Error', 'Email not found in our records');
         }
       }
     } catch (error) {
-      setVerificationStep('error');
       console.error('Verification error:', error);
-      Alert.alert('Error', 'Failed to verify email. Please check your network connection and try again.');
+      Alert.alert('Error', error.message || 'Failed to verify email');
     } finally {
       setLoading(false);
-      setVerificationStep('idle');
-    }
-  };
-
-  // Update the button text based on verification step
-  const getButtonText = () => {
-    switch (verificationStep) {
-      case 'checking':
-        return 'Verifying Email...';
-      case 'checking_staff':
-        return 'Checking Staff Records...';
-      case 'checking_student':
-        return 'Checking Student Records...';
-      case 'redirecting':
-        return 'Redirecting...';
-      default:
-        return loading ? 'Verifying...' : 'Verify Email';
     }
   };
 
@@ -304,12 +216,12 @@ export default function GoogleSignInScreen() {
       </View>
 
       <TouchableOpacity 
-        style={[styles.verifyButton, loading && styles.buttonDisabled]}
+        style={[styles.verifyButton, (loading || !rolesLoaded) && styles.buttonDisabled]}
         onPress={handleEmailVerification}
-        disabled={loading}
+        disabled={loading || !rolesLoaded}
       >
         <Text style={styles.buttonText}>
-          {getButtonText()}
+          {!rolesLoaded ? 'Loading...' : loading ? 'Verifying...' : 'Verify Email'}
         </Text>
       </TouchableOpacity>
       <Toast />

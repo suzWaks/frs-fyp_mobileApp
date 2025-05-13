@@ -1,31 +1,44 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, Modal, SafeAreaView, StyleSheet } from 'react-native';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useColorScheme } from 'nativewind';
+
+// Primary colors
+const PRIMARY_COLOR = '#7647EB';
+const PRIMARY_LIGHT = '#9D7AFF';
+const PRIMARY_DARK = '#5B2DCF';
 
 export default function MenuScreen() {
   const router = useRouter();
   const [modalVisible, setModalVisible] = useState(false);
-  const primaryColor = '#7647EB';
+  const [userData, setUserData] = useState(null);
+  const { colorScheme, setColorScheme } = useColorScheme();
+  const isDarkMode = colorScheme === 'dark';
+
+  useEffect(() => {
+    const getUserData = async () => {
+      try {
+        const data = await AsyncStorage.getItem('userData');
+        if (data) {
+          setUserData(JSON.parse(data));
+        }
+      } catch (error) {
+        console.error('Error fetching user data:', error);
+      }
+    };
+    getUserData();
+  }, []);
 
   const handleLogout = () => {
     setModalVisible(true);
   };
 
   const confirmLogout = async () => {
-    console.log("Logging out...");
     try {
-      await AsyncStorage.multiRemove(['userToken', 'userRole']);
-      console.log("AsyncStorage cleared.");
-
-      const token = await AsyncStorage.getItem('userToken');
-      const role = await AsyncStorage.getItem('userRole');
-      console.log('Token after logout:', token);
-      console.log('Role after logout:', role);
-
+      await AsyncStorage.clear();
       router.replace('/(auth)/signin');
-      console.log("Redirecting to SignIn screen...");
     } catch (error) {
       console.error("Logout failed:", error);
     }
@@ -35,49 +48,61 @@ export default function MenuScreen() {
     setModalVisible(false);
   };
 
+  // Dynamic styles based on theme
+  const dynamicStyles = {
+    backgroundColor: isDarkMode ? '#121212' : '#fff',
+    textColor: isDarkMode ? '#E2E2E2' : '#000',
+    headerBg: isDarkMode ? '#1E1E1E' : PRIMARY_LIGHT,
+    cardBg: isDarkMode ? '#1E1E1E' : '#fff',
+  };
+
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.content}>
+    <SafeAreaView style={[styles.container, { backgroundColor: dynamicStyles.backgroundColor }]}>
+      <View style={{ flex: 1 }}>
         {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.headerText}>Menu</Text>
+        <View style={[styles.header, { backgroundColor: dynamicStyles.headerBg }]}>
+          <Text style={[styles.headerText, { color: '#fff' }]}>Menu</Text>
         </View>
 
         {/* Profile Section */}
-        <TouchableOpacity style={styles.profileSection}>
-          <View style={styles.profileIcon}>
-            <Ionicons name="person-outline" size={24} color="#65676b" />
+        <TouchableOpacity 
+          style={[styles.profileSection, { backgroundColor: isDarkMode ? '#1E1E1E' : '#f5f5f5' }]}
+          onPress={() => router.push('/profile/profile')}
+        >
+          <View style={[styles.profileIcon, { backgroundColor: PRIMARY_COLOR }]}>
+            <Ionicons name="person-outline" size={24} color="#fff" />
           </View>
-          <Text style={styles.profileName}>Mughiwaraa NJ Voii</Text>
+          <Text style={[styles.profileName, { color: dynamicStyles.textColor }]}>
+            {userData?.name || 'User'}
+          </Text>
         </TouchableOpacity>
 
         {/* Main Menu Items */}
         <View style={styles.menuItems}>
-          <TouchableOpacity style={styles.menuItem}>
-            <Ionicons name="settings-outline" size={24} color="black" />
-            <Text style={styles.menuText}>Settings</Text>
+          <TouchableOpacity 
+            style={[styles.menuItem, { backgroundColor: isDarkMode ? '#1E1E1E' : '#f5f5f5' }]}
+          >
+            <Ionicons name="settings-outline" size={24} color={PRIMARY_COLOR} />
+            <Text style={[styles.menuText, { color: dynamicStyles.textColor }]}>Settings</Text>
           </TouchableOpacity>
           <View style={styles.separator} />
-          <TouchableOpacity style={styles.menuItem}>
-            <Ionicons name="notifications-outline" size={24} color="black" />
-            <Text style={styles.menuText}>Notifications</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.menuItem}>
-            <MaterialCommunityIcons name="message-text-outline" size={24} color="black" />
-            <Text style={styles.menuText}>Message requests</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.menuItem}>
-            <MaterialCommunityIcons name="archive-outline" size={24} color="black" />
-            <Text style={styles.menuText}>Archive</Text>
+          <TouchableOpacity 
+            style={[styles.menuItem, { backgroundColor: isDarkMode ? '#1E1E1E' : '#f5f5f5' }]}
+          >
+            <Ionicons name="notifications-outline" size={24} color={PRIMARY_COLOR} />
+            <Text style={[styles.menuText, { color: dynamicStyles.textColor }]}>Notifications</Text>
           </TouchableOpacity>
         </View>
 
         {/* Logout Section */}
         <View style={styles.logoutSection}>
-          <Text style={styles.moreText}>More</Text>
-          <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-            <Ionicons name="log-out-outline" size={24} color="black" />
-            <Text style={styles.logoutText}>Logout</Text>
+          <Text style={[styles.moreText, { color: PRIMARY_COLOR }]}>More</Text>
+          <TouchableOpacity 
+            style={[styles.logoutButton, { backgroundColor: isDarkMode ? '#1E1E1E' : '#f5f5f5' }]} 
+            onPress={handleLogout}
+          >
+            <Ionicons name="log-out-outline" size={24} color={PRIMARY_COLOR} />
+            <Text style={[styles.logoutText, { color: dynamicStyles.textColor }]}>Logout</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -90,19 +115,21 @@ export default function MenuScreen() {
         onRequestClose={cancelLogout}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Confirm Logout</Text>
-            <Text style={styles.modalMessage}>Are you sure you want to log out?</Text>
+          <View style={[styles.modalContent, { backgroundColor: dynamicStyles.backgroundColor }]}>
+            <Text style={[styles.modalTitle, { color: dynamicStyles.textColor }]}>Confirm Logout</Text>
+            <Text style={[styles.modalMessage, { color: dynamicStyles.textColor }]}>
+              Are you sure you want to log out?
+            </Text>
 
             <View style={styles.modalButtons}>
               <TouchableOpacity 
-                style={[styles.modalButton, styles.cancelButton]} 
+                style={[styles.modalButton, { backgroundColor: PRIMARY_COLOR }]} 
                 onPress={cancelLogout}
               >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
+                <Text style={styles.modalButtonText}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity 
-                style={[styles.modalButton, { backgroundColor: primaryColor }]} 
+                style={[styles.modalButton, { backgroundColor: PRIMARY_DARK }]} 
                 onPress={confirmLogout}
               >
                 <Text style={styles.modalButtonText}>Confirm</Text>
@@ -118,15 +145,11 @@ export default function MenuScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: 'white',
-  },
-  content: {
-    flex: 1,
   },
   header: {
     paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: '#f4f4f4',
+    paddingVertical: 16,
+    elevation: 3,
   },
   headerText: {
     fontSize: 24,
@@ -135,20 +158,21 @@ const styles = StyleSheet.create({
   profileSection: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    padding: 16,
+    marginVertical: 8,
+    marginHorizontal: 16,
+    borderRadius: 12,
   },
   profileIcon: {
     width: 48,
     height: 48,
-    backgroundColor: '#e0e0e0',
     borderRadius: 24,
     alignItems: 'center',
     justifyContent: 'center',
   },
   profileName: {
     marginLeft: 16,
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '600',
   },
   menuItems: {
@@ -158,11 +182,14 @@ const styles = StyleSheet.create({
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
+    padding: 16,
+    borderRadius: 12,
+    marginVertical: 4,
   },
   menuText: {
     marginLeft: 16,
     fontSize: 16,
+    fontWeight: '500',
   },
   separator: {
     height: 1,
@@ -175,19 +202,20 @@ const styles = StyleSheet.create({
   },
   moreText: {
     fontSize: 14,
-    color: '#888',
+    fontWeight: '600',
     marginBottom: 8,
   },
   logoutButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
+    padding: 16,
+    borderRadius: 12,
   },
   logoutText: {
     marginLeft: 16,
     fontSize: 16,
+    fontWeight: '500',
   },
-  // Modal Styles
   modalOverlay: {
     flex: 1,
     justifyContent: 'center',
@@ -196,44 +224,34 @@ const styles = StyleSheet.create({
   },
   modalContent: {
     width: '80%',
-    padding: 20,
-    backgroundColor: 'white',
-    borderRadius: 10,
+    padding: 24,
+    borderRadius: 16,
     alignItems: 'center',
   },
   modalTitle: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: 'bold',
-    marginBottom: 12,
+    marginBottom: 16,
   },
   modalMessage: {
     fontSize: 16,
-    marginBottom: 20,
+    marginBottom: 24,
     textAlign: 'center',
   },
   modalButtons: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'space-around',
     width: '100%',
   },
   modalButton: {
     paddingVertical: 12,
     paddingHorizontal: 24,
     borderRadius: 8,
+    minWidth: 100,
     alignItems: 'center',
-    justifyContent: 'center',
-    minWidth: 120,
-  },
-  cancelButton: {
-    backgroundColor: '#f0f0f0',
   },
   modalButtonText: {
     color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  cancelButtonText: {
-    color: '#333',
     fontSize: 16,
     fontWeight: '600',
   },

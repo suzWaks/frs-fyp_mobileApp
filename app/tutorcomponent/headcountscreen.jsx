@@ -5,6 +5,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useColorScheme } from "nativewind";
 import Constants from "expo-constants";
 import DateTimePicker from "@react-native-community/datetimepicker";
+import Toast from 'react-native-toast-message';
 
 export default function HeadCountScreen() {
   const { colorScheme } = useColorScheme();
@@ -19,10 +20,7 @@ export default function HeadCountScreen() {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [selectedTime, setSelectedTime] = useState("Select Time");
   const [showTimeDropdown, setShowTimeDropdown] = useState(false);
-  const timeSlots = ["08:00-9:00",
-    "09:00-10:00",
-    "10:15-11:15",
-    "11:15-12:15",];
+  const timeSlots = ["08:00 - 9:00","09:00 - 10:00","10:15 - 11:15","11:15 - 12:15","10:15 - 12:15", ]; 
 
   useEffect(() => {
     const fetchData = async () => {
@@ -66,6 +64,12 @@ export default function HeadCountScreen() {
         }
       } catch (error) {
         console.error("Error fetching data:", error);
+        Toast.show({
+          type: 'error',
+          text1: 'Error',
+          text2: 'Failed to load class data',
+          position: 'bottom',
+        });
       } finally {
         setLoading(false);
       }
@@ -105,10 +109,93 @@ export default function HeadCountScreen() {
     setStudents(students.map((student) => ({ ...student, status: "present" })));
     setDate(new Date());
     setSelectedTime("Select Time");
+    Toast.show({
+      type: 'success',
+      text1: 'Reset',
+      text2: 'All fields have been reset',
+      position: 'bottom',
+      visibilityTime: 1500,
+    });
   };
 
-  const handleDonePress = () => {
-    router.back();
+  const handleDonePress = async () => {
+    try {
+      if (selectedTime === "Select Time") {
+        Toast.show({
+          type: 'error',
+          text1: 'Error',
+          text2: 'Please select a time slot',
+          position: 'bottom',
+        });
+        return;
+      }
+  
+      const attendanceData = {
+        classId: parseInt(class_Id),
+        locationId: 1,
+        timeInterval: selectedTime,
+        studentStatuses: students.map(student => ({
+          studentId: parseInt(student.id),
+          status: capitalizeFirstLetter(student.status)
+        }))
+      };
+  
+      console.log("Sending attendance data:", JSON.stringify(attendanceData, null, 2));
+  
+      const response = await fetch(`${API_BASE_URL}/AttendanceRecords/headcount`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(attendanceData),
+      });
+  
+      const responseText = await response.text();
+      console.log("Response Text:", responseText);
+  
+      if (!response.ok) {
+        throw new Error(responseText);
+      }
+  
+      const successData = JSON.parse(responseText);
+      console.log("Attendance saved successfully:", successData);
+  
+      Toast.show({
+        type: 'success',
+        text1: 'Success',
+        text2: 'Attendance recorded successfully',
+        position: 'bottom',
+        visibilityTime: 2000,
+        onHide: () => {
+          router.push({
+            pathname: "/(tutor)/tutor",
+            params: { attendanceSuccess: "true" },
+          });
+        }
+      });
+    } catch (error) {
+      console.error("Error saving attendance:", error);
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: 'Failed to save attendance',
+        position: 'bottom',
+      });
+    }
+  };
+  
+  // Helper function to capitalize first letter and format status
+  const capitalizeFirstLetter = (status) => {
+    switch (status) {
+      case 'present':
+        return 'Present';
+      case 'absent':
+        return 'Absent';
+      case 'leave':
+        return 'Leave';
+      default:
+        return status;
+    }
   };
 
   const presentCount = students.filter(
@@ -198,210 +285,213 @@ export default function HeadCountScreen() {
   }
 
   return (
-    <View style={dynamicStyles.container}>
-      {classInfo && (
-        <Text style={dynamicStyles.moduleInfo}>
-          {classInfo.module_Code} - {classInfo.class_Name}
-        </Text>
-      )}
+    <>
+      <View style={dynamicStyles.container}>
+        {classInfo && (
+          <Text style={dynamicStyles.moduleInfo}>
+            {classInfo.module_Code} - {classInfo.class_Name}
+          </Text>
+        )}
 
-      <View style={{ marginBottom: 20, zIndex: 10 }}>
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-          {/* Date Picker */}
-          <TouchableOpacity
-            onPress={() => setShowDatePicker(true)}
-            style={{
-              flex: 1,
-              borderWidth: 1,
-              borderColor: "#D1D5DB",
-              padding: 12,
-              borderRadius: 8,
-              backgroundColor: colorScheme === "dark" ? "#374151" : "#fff",
-            }}
-          >
-            <Text
-              style={{ color: colorScheme === "dark" ? "#D1D5DB" : "#000" }}
-            >
-              {date.toDateString()}
-            </Text>
-          </TouchableOpacity>
-
-          {/* Time Dropdown Trigger */}
-          <View style={{ flex: 1 }}>
+        <View style={{ marginBottom: 20, zIndex: 10 }}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+            {/* Date Picker */}
             <TouchableOpacity
-              onPress={() => setShowTimeDropdown(!showTimeDropdown)}
+              onPress={() => setShowDatePicker(true)}
               style={{
+                flex: 1,
                 borderWidth: 1,
                 borderColor: "#D1D5DB",
                 padding: 12,
                 borderRadius: 8,
-                flexDirection: "row",
-                justifyContent: "space-between",
-                alignItems: "center",
                 backgroundColor: colorScheme === "dark" ? "#374151" : "#fff",
               }}
             >
               <Text
                 style={{ color: colorScheme === "dark" ? "#D1D5DB" : "#000" }}
               >
-                {selectedTime}
+                {date.toDateString()}
               </Text>
-              <Ionicons
-                name={showTimeDropdown ? "chevron-up" : "chevron-down"}
-                size={16}
-                color={colorScheme === "dark" ? "#D1D5DB" : "#000"}
-              />
             </TouchableOpacity>
 
-            {/* Floating Dropdown */}
-            {showTimeDropdown && (
-              <View
+            {/* Time Dropdown Trigger */}
+            <View style={{ flex: 1 }}>
+              <TouchableOpacity
+                onPress={() => setShowTimeDropdown(!showTimeDropdown)}
                 style={{
-                  position: "absolute",
-                  top: 50,
-                  left: 0,
-                  right: 0,
-                  backgroundColor: "#fff",
-                  borderRadius: 10,
                   borderWidth: 1,
                   borderColor: "#D1D5DB",
-                  zIndex: 999,
-                  elevation: 5,
+                  padding: 12,
+                  borderRadius: 8,
+                  flexDirection: "row",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  backgroundColor: colorScheme === "dark" ? "#374151" : "#fff",
                 }}
               >
-                <FlatList
-                  data={timeSlots}
-                  keyExtractor={(item) => item}
-                  renderItem={({ item }) => (
-                    <TouchableOpacity
-                      style={{
-                        padding: 12,
-                        borderBottomWidth: 1,
-                        borderBottomColor: "#D1D5DB",
-                        backgroundColor:
-                          colorScheme === "dark" ? "#374151" : "#fff",
-                      }}
-                      onPress={() => handleTimeSelect(item)}
-                    >
-                      <Text
-                        style={{
-                          color: colorScheme === "dark" ? "#D1D5DB" : "#000",
-                        }}
-                      >
-                        {item}
-                      </Text>
-                    </TouchableOpacity>
-                  )}
+                <Text
+                  style={{ color: colorScheme === "dark" ? "#D1D5DB" : "#000" }}
+                >
+                  {selectedTime}
+                </Text>
+                <Ionicons
+                  name={showTimeDropdown ? "chevron-up" : "chevron-down"}
+                  size={16}
+                  color={colorScheme === "dark" ? "#D1D5DB" : "#000"}
                 />
-              </View>
-            )}
+              </TouchableOpacity>
+
+              {/* Floating Dropdown */}
+              {showTimeDropdown && (
+                <View
+                  style={{
+                    position: "absolute",
+                    top: 50,
+                    left: 0,
+                    right: 0,
+                    backgroundColor: "#fff",
+                    borderRadius: 10,
+                    borderWidth: 1,
+                    borderColor: "#D1D5DB",
+                    zIndex: 999,
+                    elevation: 5,
+                  }}
+                >
+                  <FlatList
+                    data={timeSlots}
+                    keyExtractor={(item) => item}
+                    renderItem={({ item }) => (
+                      <TouchableOpacity
+                        style={{
+                          padding: 12,
+                          borderBottomWidth: 1,
+                          borderBottomColor: "#D1D5DB",
+                          backgroundColor:
+                            colorScheme === "dark" ? "#374151" : "#fff",
+                        }}
+                        onPress={() => handleTimeSelect(item)}
+                      >
+                        <Text
+                          style={{
+                            color: colorScheme === "dark" ? "#D1D5DB" : "#000",
+                          }}
+                        >
+                          {item}
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+                  />
+                </View>
+              )}
+            </View>
+
+            {/* Reset Button */}
+            <TouchableOpacity
+              style={{
+                width: 25,
+                height: 25,
+                justifyContent: "center",
+                alignItems: "center",
+              }}
+              onPress={handleReset}
+            >
+              <Ionicons name="refresh" size={25} color={colorScheme === "dark" ? "#D1D5DB" : "#000"} />
+            </TouchableOpacity>
           </View>
 
-          {/* Reset Button */}
-          <TouchableOpacity
-            style={{
-              width: 25,
-              height: 25,
-              justifyContent: "center",
-              alignItems: "center",
-            }}
-            onPress={handleReset}
-          >
-            <Ionicons name="refresh" size={25} color="#000" />
-          </TouchableOpacity>
+          {showDatePicker && (
+            <DateTimePicker
+              value={date}
+              mode="date"
+              display="default"
+              onChange={handleDateChange}
+            />
+          )}
         </View>
 
-        {showDatePicker && (
-          <DateTimePicker
-            value={date}
-            mode="date"
-            display="default"
-            onChange={handleDateChange}
-          />
-        )}
-      </View>
-
-      <View style={dynamicStyles.summaryContainer}>
-        <View style={styles.summaryRow}>
-          <Text style={dynamicStyles.summaryText}>Total present:</Text>
-          <Text style={dynamicStyles.summaryCount}>{presentCount} members</Text>
-        </View>
-        <View style={[styles.summaryRow, { marginTop: 8 }]}>
-          <Text style={dynamicStyles.summaryText}>Total absent:</Text>
-          <Text style={dynamicStyles.summaryCount}>{absentCount} members</Text>
-        </View>
-        <View style={[styles.summaryRow, { marginTop: 8 }]}>
-          <Text style={dynamicStyles.summaryText}>Total on leave:</Text>
-          <Text style={dynamicStyles.summaryCount}>{leaveCount} members</Text>
-        </View>
-      </View>
-
-      <FlatList
-        data={students}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <View style={dynamicStyles.studentCard}>
-            <Text style={dynamicStyles.studentNumber}>
-              {item.studentNumber}
-            </Text>
-            <Text style={dynamicStyles.studentName}>{item.name}</Text>
-
-            <Pressable
-              style={({ pressed }) => [
-                dynamicStyles.actionButton,
-                { marginRight: 10 },
-                pressed && styles.buttonPressed,
-                item.status === "present" && { backgroundColor: "#6B4EFF" },
-              ]}
-              onPress={() => toggleStatus(item.id, "present")}
-            >
-              <Ionicons
-                name="checkmark"
-                size={20}
-                color={item.status === "present" ? "#fff" : "#10B981"}
-              />
-            </Pressable>
-
-            <Pressable
-              style={({ pressed }) => [
-                dynamicStyles.actionButton,
-                pressed && styles.buttonPressed,
-                item.status === "absent" && { backgroundColor: "#6B4EFF" },
-              ]}
-              onPress={() => toggleStatus(item.id, "absent")}
-            >
-              <Ionicons
-                name="close"
-                size={20}
-                color={item.status === "absent" ? "#fff" : "#FF6B6B"}
-              />
-            </Pressable>
-
-            <Pressable
-              style={({ pressed }) => [
-                dynamicStyles.actionButton,
-                pressed && styles.buttonPressed,
-                item.status === "leave" && { backgroundColor: "#6B4EFF" },
-              ]}
-              onPress={() => toggleStatus(item.id, "leave")}
-            >
-              <Ionicons
-                name="add-outline"
-                size={20}
-                color={item.status === "leave" ? "#fff" : "#3B82F6"}
-              />
-            </Pressable>
+        <View style={dynamicStyles.summaryContainer}>
+          <View style={styles.summaryRow}>
+            <Text style={dynamicStyles.summaryText}>Total present:</Text>
+            <Text style={dynamicStyles.summaryCount}>{presentCount} members</Text>
           </View>
-        )}
-      />
+          <View style={[styles.summaryRow, { marginTop: 8 }]}>
+            <Text style={dynamicStyles.summaryText}>Total absent:</Text>
+            <Text style={dynamicStyles.summaryCount}>{absentCount} members</Text>
+          </View>
+          <View style={[styles.summaryRow, { marginTop: 8 }]}>
+            <Text style={dynamicStyles.summaryText}>Total on leave:</Text>
+            <Text style={dynamicStyles.summaryCount}>{leaveCount} members</Text>
+          </View>
+        </View>
 
-      <TouchableOpacity
-        style={dynamicStyles.doneButton}
-        onPress={handleDonePress}
-      >
-        <Text style={styles.doneButtonText}>Done</Text>
-      </TouchableOpacity>
-    </View>
+        <FlatList
+          data={students}
+          keyExtractor={(item) => item.id}
+          renderItem={({ item }) => (
+            <View style={dynamicStyles.studentCard}>
+              <Text style={dynamicStyles.studentNumber}>
+                {item.studentNumber}
+              </Text>
+              <Text style={dynamicStyles.studentName}>{item.name}</Text>
+
+              <Pressable
+                style={({ pressed }) => [
+                  dynamicStyles.actionButton,
+                  { marginRight: 10 },
+                  pressed && styles.buttonPressed,
+                  item.status === "present" && { backgroundColor: "#6B4EFF" },
+                ]}
+                onPress={() => toggleStatus(item.id, "present")}
+              >
+                <Ionicons
+                  name="checkmark"
+                  size={20}
+                  color={item.status === "present" ? "#fff" : "#10B981"}
+                />
+              </Pressable>
+
+              <Pressable
+                style={({ pressed }) => [
+                  dynamicStyles.actionButton,
+                  pressed && styles.buttonPressed,
+                  item.status === "absent" && { backgroundColor: "#6B4EFF" },
+                ]}
+                onPress={() => toggleStatus(item.id, "absent")}
+              >
+                <Ionicons
+                  name="close"
+                  size={20}
+                  color={item.status === "absent" ? "#fff" : "#FF6B6B"}
+                />
+              </Pressable>
+
+              <Pressable
+                style={({ pressed }) => [
+                  dynamicStyles.actionButton,
+                  pressed && styles.buttonPressed,
+                  item.status === "leave" && { backgroundColor: "#6B4EFF" },
+                ]}
+                onPress={() => toggleStatus(item.id, "leave")}
+              >
+                <Ionicons
+                  name="add-outline"
+                  size={20}
+                  color={item.status === "leave" ? "#fff" : "#3B82F6"}
+                />
+              </Pressable>
+            </View>
+          )}
+        />
+
+        <TouchableOpacity
+          style={dynamicStyles.doneButton}
+          onPress={handleDonePress}
+        >
+          <Text style={styles.doneButtonText}>Done</Text>
+        </TouchableOpacity>
+      </View>
+      <Toast />
+    </>
   );
 }
 

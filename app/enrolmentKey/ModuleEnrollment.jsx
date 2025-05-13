@@ -7,9 +7,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 const API_CONFIG = {
   BASE_URL: Platform.select({
     web: 'http://localhost:5253/api',
-    android: 'http://10.2.5.57:5253/api',
-    ios: 'http://10.2.23.163:5253/api',
-    default: 'http://10.2.5.57:5253/api'
+    android: 'http://10.2.23.104:5253/api',
+    ios: 'http://localhost:5253/api',
+    default: 'http://10.2.23.104:5253/api'
   }),
   ENDPOINTS: {
     CLASSES: '/Classes',
@@ -18,7 +18,7 @@ const API_CONFIG = {
 };
 
 const EnrollmentScreen = () => {
-  const { code, name, instructor, classId } = useLocalSearchParams();
+  const { code, name, instructor, classId, studentId } = useLocalSearchParams();
   const [enrollmentKey, setEnrollmentKey] = useState('');
   const router = useRouter();
 
@@ -89,26 +89,23 @@ const EnrollmentScreen = () => {
       // Combine existing and new moduleIds
       const updatedModuleIds = [...existingModuleIds, parseInt(classId)];
 
-      // Now PUT the class_Id into student's ModuleIds array
-      const updateResponse = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.STUDENTS}/${student.id}`, {
+      // Now PUT the class_Id into student's ModuleIds array using the passed studentId
+      const updateResponse = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.STUDENTS}/${studentId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-            // Wrap in request object as required by API
-            id: student.id,
-            student_Id: student.studentId ? parseInt(student.studentId) : 0, // Ensure it's a number
-            google_Id: student.google_Id,
-            name: student.name,
-            email: student.email,
-            year: student.year || "1",
-            phone_No: parseInt(student.phone_No) || 0,
-            profile_PictureURL: student.profile_PictureURL || "",
-            role_Id: 5, // Changed to 5 for STUDENT role
-            department_Id: parseInt(student.department_Id) || 1,
-            moduleIds: updatedModuleIds  // Use camelCase to match backend
-          
+          id: studentId,
+          student_Id: parseInt(student.studentId) || 0,
+          google_Id: student.google_Id,
+          name: student.name,
+          email: student.email,
+          year: student.year || "1",
+          phone_No: parseInt(student.phone_No) || 0,
+          profile_PictureURL: student.profile_PictureURL || "",
+          department_Id: parseInt(student.department_Id) || 1,
+          moduleIds: updatedModuleIds
         })
       });
 
@@ -137,7 +134,10 @@ const EnrollmentScreen = () => {
         setTimeout(() => {
           router.replace({
             pathname: '/(students)/student',
-            params: { refresh: true }
+            params: { 
+              refresh: true,
+              instructorName: instructor // This is already passing the instructor name
+            }
           });
         }, 2000);
       } else {

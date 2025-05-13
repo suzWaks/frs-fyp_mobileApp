@@ -49,7 +49,7 @@ export default function AttendanceScreen() {
         encoding: FileSystem.EncodingType.Base64,
       });
 
-      const response = await fetch('http://10.2.5.57:5000/compare', {
+      const response = await fetch('http://10.2.23.104:5000/compare', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

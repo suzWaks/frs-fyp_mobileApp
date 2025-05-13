@@ -65,7 +65,7 @@ export default function HomeScreen() {
   useEffect(() => {
     const getDepartments = async () => {
       try {
-        const response = await fetch('http://localhost:5253/api/Departments');
+        const response = await fetch('http://10.2.23.104:5253/api/Departments');
         const data = await response.json();
         console.log('Department data:', data); // Check the data structure
         setDepartments(data);

@@ -7,6 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { fetchYears } from '../api/name'; // Make sure this exists
 
 export default function StudentDepartmentScreen() {
+  const params = useLocalSearchParams();  // Add this line
   const { colorScheme, setColorScheme } = useColorScheme();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [selectedYear, setSelectedYear] = useState('Choose Year');
@@ -55,6 +56,9 @@ export default function StudentDepartmentScreen() {
       }
 
       const user = JSON.parse(userData);
+      console.log('User Data:', user);  // Debug log
+      console.log('Params:', params);   // Debug log
+
       setSelectedYear(year);
       setIsDropdownOpen(false);
 
@@ -64,7 +68,7 @@ export default function StudentDepartmentScreen() {
         params: {
           year: year,
           studentId: user.id,
-          departmentId: user.department_Id
+          departmentId: user.departmentId || params.departmentId || 1  // Use the correct property name
         }
       });
     } catch (error) {

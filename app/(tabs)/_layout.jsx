@@ -5,13 +5,13 @@ import { useColorScheme } from "react-native";
 export default function TabLayout() {
   const { colorScheme } = useColorScheme();
   const isDark = colorScheme === "dark";
-
+  
   // Define colors based on theme
   const activeColor = "#7647EB"; // Highlighted color for selected tab
   const inactiveColor = isDark ? "#a9b1d6" : "#11181C";
   const backgroundColor = isDark ? "#1a1b26" : "#FFFFFF";
   const borderColor = isDark ? "#2c2e3f" : "#e0e0e0";
-
+  
   return (
     <Tabs
       screenOptions={{
@@ -31,7 +31,7 @@ export default function TabLayout() {
       }}
     >
       <Tabs.Screen
-        name="home"
+        name="student"
         options={{
           title: "Home",
           tabBarIcon: ({ color, size }) => (
@@ -39,15 +39,7 @@ export default function TabLayout() {
           ),
         }}
       />
-      <Tabs.Screen
-        name="modules"
-        options={{
-          title: "Modules",
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="library" size={size} color={color} />
-          ),
-        }}
-      />
+      
       <Tabs.Screen
         name="menu"
         options={{

@@ -58,7 +58,7 @@ export default function EditProfileScreen() {
       const storedUserData = await AsyncStorage.getItem('userData');
       const parsedUserData = JSON.parse(storedUserData);
       
-      const response = await fetch(`http://10.0.2.2:5253/api/Staffs/${parsedUserData.staffId}`, {
+      const response = await fetch(`http://10.2.23.104:5253/api/Staffs/${parsedUserData.staffId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

@@ -10,9 +10,9 @@ import { Platform } from 'react-native'; // Add this import at the top
 const API_CONFIG = {
   BASE_URL: Platform.select({
     web: 'http://localhost:5253/api',
-    android: 'http://10.2.23.83:5253/api',
+    android: 'http://10.2.23.104:5253/api',
     ios: 'http://localhost:5253/api',
-    default: 'http://10.2.23.83:5253/api'
+    default: 'http://10.2.23.104:5253/api'
   })
 };
 
@@ -51,14 +51,21 @@ export default function StudentScreen() {
       const data = await response.json();
       
       // Transform data to match our card component structure
-      const formattedModules = data.map(module => ({
-        code: module.enrollKey || '',
-        name: module.class_Name || '',
-        instructor: module.instructorName || 'Not Assigned',
-        progress: module.progress || '0%',
-        totalClasses: module.totalClasses || 0,
-        class_Id: module.class_Id
-      }));
+      const formattedModules = data.map(module => {
+        // Get the first staff member's name (assuming first staff is the main instructor)
+        const instructorName = module.staff && module.staff.length > 0 
+          ? module.staff[0].name 
+          : 'Not Assigned';
+
+        return {
+          code: module.enrollKey || '',
+          name: module.class_Name || '',
+          instructor: instructorName,
+          progress: module.progress || '0%',
+          totalClasses: module.totalClasses || 0,
+          class_Id: module.class_Id
+        };
+      });
 
       setModules(formattedModules);
     } catch (error) {
@@ -80,12 +87,13 @@ export default function StudentScreen() {
     const userData = await AsyncStorage.getItem('userData');
     if (userData) {
       const parsedUserData = JSON.parse(userData);
-      console.log('Student Data being passed:', parsedUserData); // Add this log
+      console.log('Student Data being passed:', parsedUserData);
       router.push({
         pathname: '/department/studentname',
         params: { 
           studentId: parsedUserData.id,
-          studentData: JSON.stringify(parsedUserData)  // Make sure to stringify the data
+          departmentId: parsedUserData.departmentId,  // Add this line
+          studentData: JSON.stringify(parsedUserData)
         }
       });
     }
@@ -195,7 +203,7 @@ export default function StudentScreen() {
             <View style={styles.cardHeader}>
               <Text style={styles.courseCode}>{item.code}</Text>
               <Text style={styles.courseTitle}>{item.name}</Text>
-              <Text style={styles.instructor}>Prof. {item.instructor}</Text>
+              <Text style={styles.instructor}>Prof: {item.instructor}</Text>
             </View>
 
             <View style={[styles.cardFooter, { backgroundColor: colors.cardFooter }]}>

@@ -10,9 +10,9 @@ import { Ionicons } from '@expo/vector-icons';
 const API_CONFIG = {
   BASE_URL: Platform.select({
     web: 'http://localhost:5253',
-    android: 'http://10.2.5.57:5253',
+    android: 'http://10.2.23.104:5253',
     ios: 'http://10.2.23.163:5253',
-    default: 'http://10.2.5.57:5253'
+    default: 'http://10.2.23.104:5253'
   }),
 };
 
