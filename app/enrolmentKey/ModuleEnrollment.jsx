@@ -2,20 +2,9 @@ import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, Platform, ToastAndroid } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Constants from 'expo-constants';
 
-// Add API configuration
-const API_CONFIG = {
-  BASE_URL: Platform.select({
-    web: 'http://localhost:5253/api',
-    android: 'http://10.2.23.104:5253/api',
-    ios: 'http://localhost:5253/api',
-    default: 'http://10.2.23.104:5253/api'
-  }),
-  ENDPOINTS: {
-    CLASSES: '/Classes',
-    STUDENTS: '/Students'  // Added Students endpoint
-  }
-};
+const API_BASE_URL = Constants.expoConfig.extra.API_BASE_URL;
 
 const EnrollmentScreen = () => {
   const { code, name, instructor, classId, studentId } = useLocalSearchParams();
@@ -90,7 +79,7 @@ const EnrollmentScreen = () => {
       const updatedModuleIds = [...existingModuleIds, parseInt(classId)];
 
       // Now PUT the class_Id into student's ModuleIds array using the passed studentId
-      const updateResponse = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.STUDENTS}/${studentId}`, {
+      const updateResponse = await fetch(`${API_BASE_URL}/Students/${studentId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

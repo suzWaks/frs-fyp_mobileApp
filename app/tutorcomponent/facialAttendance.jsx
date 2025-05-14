@@ -1,13 +1,14 @@
+//facialattendance.jsx
+
 import React, { useState, useEffect } from "react";
-import { View, Text, TouchableOpacity, FlatList } from "react-native";
+import { View, Text, TouchableOpacity, FlatList, Alert } from "react-native";
 import { FontAwesome5 } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import { useColorScheme } from "nativewind";
 import Constants from "expo-constants";
 
-const API_BASE_URL = Constants.expoConfig.extra.API_BASE_URL; // Replace with your actual API base URL
-
+const API_BASE_URL = Constants.expoConfig.extra.API_BASE_URL;
 const CustomDropdown = ({
   selectedValue,
   onValueChange,
@@ -59,23 +60,66 @@ const CustomDropdown = ({
   );
 };
 
+// Format time from Date object to string in 12-hour format (e.g., "10:00 AM")
+const formatTime = (date) => {
+  let hours = date.getHours();
+  const minutes = date.getMinutes().toString().padStart(2, '0');
+  const ampm = hours >= 12 ? 'PM' : 'AM';
+  
+  hours = hours % 12;
+  hours = hours ? hours : 12; // Convert 0 to 12
+  
+  return `${hours}:${minutes} ${ampm}`;
+};
+
 export default function FacialAttendance() {
   const { colorScheme, toggleColorScheme } = useColorScheme();
-  const [selectedTime, setSelectedTime] = useState("10:00 - 12:00 AM");
+  const [startTime, setStartTime] = useState(new Date());
+  const [endTime, setEndTime] = useState(() => {
+    const date = new Date();
+    date.setHours(date.getHours() + 2); // Default end time is 2 hours after start time
+    return date;
+  });
   const [selectedTimeLimit, setSelectedTimeLimit] = useState("5 Minutes");
   const [selectedCoordinates, setSelectedCoordinates] = useState("");
   const [locationOptions, setLocationOptions] = useState([]);
+  const [locationData, setLocationData] = useState([]);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [dropdownOpen, setDropdownOpen] = useState({
     date: false,
-    time: false,
+    startTime: false,
+    endTime: false,
     coordinates: false,
     timeLimit: false,
   });
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showTimePicker, setShowTimePicker] = useState({
+    start: false,
+    end: false
+  });
   const [loadingLocations, setLoadingLocations] = useState(true);
+  const [isCreatingAttendance, setIsCreatingAttendance] = useState(false);
+  
+  // Get class_Id from route params
+  const params = useLocalSearchParams();
+  const [selectedClassId, setSelectedClassId] = useState(params.class_Id ? parseInt(params.class_Id) : 0);
 
   const router = useRouter();
+
+  // Display class ID for debugging
+  useEffect(() => {
+    console.log("Received class_Id in FacialAttendance:", selectedClassId);
+  }, [selectedClassId]);
+
+  // Formatted time display string like "10:00 - 12:00 AM"
+  const formattedTimeDisplay = () => {
+    return `${formatTime(startTime)} - ${formatTime(endTime)}`;
+  };
+
+  // Get time interval in proper format for API request
+  const getTimeIntervalString = () => {
+    return `${formatTime(startTime)} - ${formatTime(endTime)}`;
+  };
 
   useEffect(() => {
     const fetchLocations = async () => {
@@ -87,11 +131,13 @@ export default function FacialAttendance() {
         const data = await response.json();
         const locationNames = data.map(location => location.locationName);
         setLocationOptions(locationNames);
+        setLocationData(data); // Store the full location data
         if (locationNames.length > 0) {
           setSelectedCoordinates(locationNames[0]);
         }
       } catch (error) {
         console.error('Error fetching locations:', error);
+        Alert.alert("Error", "Failed to fetch locations. Please try again.");
       } finally {
         setLoadingLocations(false);
       }
@@ -103,7 +149,8 @@ export default function FacialAttendance() {
   const toggleDropdown = (field) => {
     setDropdownOpen((prev) => ({
       date: false,
-      time: false,
+      startTime: false,
+      endTime: false,
       coordinates: false,
       timeLimit: false,
       [field]: !prev[field],
@@ -115,6 +162,138 @@ export default function FacialAttendance() {
       setSelectedDate(selectedDate);
     }
     setShowDatePicker(false);
+  };
+
+  const handleStartTimeChange = (event, selectedTime) => {
+    if (selectedTime) {
+      setStartTime(selectedTime);
+      
+      // If end time is before the new start time, adjust it
+      if (endTime < selectedTime) {
+        const newEndTime = new Date(selectedTime);
+        newEndTime.setHours(newEndTime.getHours() + 2);
+        setEndTime(newEndTime);
+      }
+    }
+    setShowTimePicker({...showTimePicker, start: false});
+  };
+
+  const handleEndTimeChange = (event, selectedTime) => {
+    if (selectedTime) {
+      // Ensure end time is not before start time
+      if (selectedTime > startTime) {
+        setEndTime(selectedTime);
+      } else {
+        // If selected end time is before start time, set it to start time + 30 min
+        const newEndTime = new Date(startTime);
+        newEndTime.setMinutes(newEndTime.getMinutes() + 30);
+        setEndTime(newEndTime);
+      }
+    }
+    setShowTimePicker({...showTimePicker, end: false});
+  };
+
+  // Find location ID based on selected location name
+  const getLocationId = () => {
+    const selectedLocation = locationData.find(
+      location => location.locationName === selectedCoordinates
+    );
+    return selectedLocation ? selectedLocation.location_Id : 0;
+  };
+
+  // Parse time limit string to minutes
+  const parseTimeLimit = (timeLimitString) => {
+    // Extract the number from strings like "5 Minutes"
+    const minutes = parseInt(timeLimitString.split(' ')[0], 10);
+    return isNaN(minutes) ? 5 : minutes; // Default to 5 if parsing fails
+  };
+
+  // Handle creating a new attendance record
+  const handleCreateAttendance = async () => {
+    if (selectedClassId <= 0) {
+      Alert.alert(
+        "Error",
+        "Invalid class ID. Please try again.",
+        [{ text: "OK" }]
+      );
+      return;
+    }
+    
+    setIsCreatingAttendance(true);
+    
+    try {
+      const locationId = getLocationId();
+      
+      // Use the class ID passed from AttendanceDialog
+      const classId = selectedClassId;
+      
+      // Extract time limit in minutes
+      const timeLimitMinutes = parseTimeLimit(selectedTimeLimit);
+      
+      // Create attendance data object
+      const attendanceData = {
+        attendance_Id: 0, // API will assign the real ID
+        date: selectedDate.toISOString(),
+        time_Interval: getTimeIntervalString(),
+        class_Id: classId,
+        location_Id: locationId,
+        isActive: true
+      };
+      
+      console.log("Creating attendance with data:", attendanceData);
+      
+      const response = await fetch(`${API_BASE_URL}/AttendanceRecords`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(attendanceData)
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to create attendance: ${errorText}`);
+      }
+      
+      const result = await response.json();
+      console.log("Attendance created successfully:", result);
+      
+      // Store the attendance ID and time limit in AsyncStorage for use in realTimeRecord
+      try {
+        const attendanceSession = {
+          attendanceId: result.attendance_Id,
+          timeLimitMinutes: timeLimitMinutes,
+          startTime: new Date().toISOString(),
+          timeInterval: getTimeIntervalString(),
+          locationName: selectedCoordinates,
+          endTime: endTime.toISOString(),
+          expiryTime: new Date(Date.now() + timeLimitMinutes * 60 * 1000).toISOString(),
+          classId: classId
+        };
+        
+        // Instead of using AsyncStorage directly, we'll pass the data in router params
+        router.push({
+          pathname: "/tutorcomponent/realTimeRecord",
+          params: { 
+            attendanceData: JSON.stringify(attendanceSession) 
+          }
+        });
+      } catch (storageError) {
+        console.error("Error storing attendance session data:", storageError);
+        // Still navigate but without the params
+        router.push("/tutorcomponent/realTimeRecord");
+      }
+      
+    } catch (error) {
+      console.error("Error creating attendance:", error);
+      Alert.alert(
+        "Error",
+        "Failed to create attendance record. Please try again.",
+        [{ text: "OK" }]
+      );
+    } finally {
+      setIsCreatingAttendance(false);
+    }
   };
 
   const customStyles = {
@@ -154,16 +333,57 @@ export default function FacialAttendance() {
           isOpen={dropdownOpen.date}
         />
 
-        {/* Time Field */}
-        <CustomDropdown
-          selectedValue={selectedTime}
-          onValueChange={setSelectedTime}
-          options={["10:00 - 12:00 AM", "12:00 - 2:00 PM", "2:00 - 4:00 PM"]}
-          isOpen={dropdownOpen.time}
-          toggleOpen={() => toggleDropdown("time")}
-          icon="clock"
-          customStyles={customStyles}
-        />
+        {/* Time Field - Split into Start and End Time */}
+        <View className="mb-4 relative">
+          <Text className={`text-lg mb-1 ${colorScheme === "dark" ? "text-gray-400" : "text-gray-600"}`}>
+            Time Range
+          </Text>
+          <View className="flex-row justify-between items-center">
+            <Text className={`text-lg ${colorScheme === "dark" ? "text-gray-400" : "text-gray-600"}`}>
+              {formattedTimeDisplay()}
+            </Text>
+          </View>
+          
+          {/* Start Time Selection */}
+          <View className="flex-row justify-between items-center mt-2">
+            <Text className={`${customStyles.selectedText}`}>
+              Start:
+            </Text>
+            <TouchableOpacity 
+              className="flex-row items-center"
+              onPress={() => setShowTimePicker({...showTimePicker, start: true})}
+            >
+              <Text className={`mr-2 ${customStyles.selectedText}`}>
+                {formatTime(startTime)}
+              </Text>
+              <FontAwesome5
+                name="clock"
+                size={16}
+                color={customStyles.iconColor}
+              />
+            </TouchableOpacity>
+          </View>
+          
+          {/* End Time Selection */}
+          <View className="flex-row justify-between items-center mt-2">
+            <Text className={`${customStyles.selectedText}`}>
+              End:
+            </Text>
+            <TouchableOpacity 
+              className="flex-row items-center"
+              onPress={() => setShowTimePicker({...showTimePicker, end: true})}
+            >
+              <Text className={`mr-2 ${customStyles.selectedText}`}>
+                {formatTime(endTime)}
+              </Text>
+              <FontAwesome5
+                name="clock"
+                size={16}
+                color={customStyles.iconColor}
+              />
+            </TouchableOpacity>
+          </View>
+        </View>
 
         {/* Coordinates Field */}
         {!loadingLocations && (
@@ -189,19 +409,30 @@ export default function FacialAttendance() {
           customStyles={customStyles}
         />
 
+        {/* Selected Location and Class ID Display -- Use for debugging
+        <View className="mb-2">
+          <Text className={`text-sm ${colorScheme === "dark" ? "text-gray-400" : "text-gray-600"}`}>
+            Selected Location ID: {getLocationId()}
+          </Text>
+          <Text className={`text-sm ${colorScheme === "dark" ? "text-gray-400" : "text-gray-600"}`}>
+            Selected Class ID: {selectedClassId}
+          </Text>
+        </View> */}
+
         {/* Start Attendance Button */}
         <TouchableOpacity
           className={`py-3 rounded-[10px] shadow-md mt-6 ${
             colorScheme === "dark" ? "bg-primary" : "bg-primary"
-          }`}
-          onPress={() => router.push("/tutorcomponent/realTimeRecord")}
+          } ${isCreatingAttendance || selectedClassId <= 0 ? "opacity-50" : "opacity-100"}`}
+          onPress={handleCreateAttendance}
+          disabled={isCreatingAttendance || loadingLocations || selectedClassId <= 0}
         >
           <Text
             className={`text-center font-bold ${
               colorScheme === "dark" ? "text-white" : "text-white"
             }`}
           >
-            Start Attendance
+            {isCreatingAttendance ? "Creating..." : "Start Attendance"}
           </Text>
         </TouchableOpacity>
       </View>
@@ -213,6 +444,26 @@ export default function FacialAttendance() {
           mode="date"
           display="default"
           onChange={handleDateChange}
+        />
+      )}
+
+      {/* Start Time Picker */}
+      {showTimePicker.start && (
+        <DateTimePicker
+          value={startTime}
+          mode="time"
+          display="default"
+          onChange={handleStartTimeChange}
+        />
+      )}
+
+      {/* End Time Picker */}
+      {showTimePicker.end && (
+        <DateTimePicker
+          value={endTime}
+          mode="time"
+          display="default"
+          onChange={handleEndTimeChange}
         />
       )}
     </View>

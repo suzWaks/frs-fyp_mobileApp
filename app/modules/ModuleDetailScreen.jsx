@@ -4,6 +4,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useColorScheme } from 'nativewind';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import Constants from 'expo-constants';
 
 const attendanceData = [
   { date: '19th Nov, 2024', time: '9:30 am - 10:30 am' },
@@ -24,12 +25,9 @@ export default function ModuleDetailScreen() {
   const [selectedTime, setSelectedTime] = useState(new Date());
   const [isWeb] = useState(Platform.OS === 'web');
 
-  // API configuration
-  const API_BASE_URL = Platform.select({
-    android: 'http://10.2.23.104:5253/api',
-    ios: 'http://localhost:5253',
-    default: 'http://10.2.23.104:5253/api',
-  });
+
+
+  const API_BASE_URL = Constants.expoConfig.extra.API_BASE_URL;
 
   useEffect(() => {
     fetchAttendanceRecords();

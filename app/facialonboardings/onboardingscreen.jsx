@@ -5,41 +5,32 @@ import * as FileSystem from 'expo-file-system';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
+import Constants from 'expo-constants';
 
 const { width } = Dimensions.get('window');
+  const API_MODEL_URL = Constants.expoConfig.extra.API_MODEL_URL;
 
 export default function OnboardingScreen() {
-  const [facing, setFacing] = useState('back');
+  const [facing, setFacing] = useState('front');
   const [capturedImageUri, setCapturedImageUri] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const cameraRef = useRef(null);
   const [studentId, setStudentId] = useState(null);
   const [studentName, setStudentName] = useState(null); 
+  const router = useRouter();
+
 
   useEffect(() => {
     const loadStudentId = async () => {
       try {
         const userData = await AsyncStorage.getItem('userData');
+        console.log("User Dataz:", userData);
         if (userData) {
           const { id, name, faceRegistered } = JSON.parse(userData); 
           
           // Check if this user already has face registered
           if (faceRegistered) {
-            Alert.alert(
-              'Face Already Registered',
-              'You have already registered your face. Please use the login screen.',
-              [
-                {
-                  text: 'OK',
-                  onPress: () => {
-                    // Clear user data and redirect to login
-                    AsyncStorage.removeItem('userData');
-                    router.replace('/(auth)/signin');
-                  }
-                }
-              ]
-            );
-            return;
+            router.replace('/(students)/student');
           }
           
           setStudentId(id);
@@ -52,7 +43,6 @@ export default function OnboardingScreen() {
     loadStudentId();
   }, []);
 
-  const router = useRouter();
 
   const registerFace = async () => {
     if (!capturedImageUri) return;
@@ -68,7 +58,7 @@ export default function OnboardingScreen() {
         encoding: FileSystem.EncodingType.Base64,
       });
 
-      const response = await fetch('http://10.2.23.104:5000/recognize', {
+      const response = await fetch(`${API_MODEL_URL}/recognize`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -76,8 +66,7 @@ export default function OnboardingScreen() {
         body: JSON.stringify({
           image: base64,
           studentId: studentId,
-          studentName: studentName,
-          token: await AsyncStorage.getItem('userToken'), // Add token for verification
+          studentName: studentName
         }),
       });
 

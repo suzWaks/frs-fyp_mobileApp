@@ -4,17 +4,9 @@ import { useColorScheme } from "nativewind";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useFocusEffect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Platform } from 'react-native'; // Add this import at the top
+import Constants from 'expo-constants';
 
-// API configuration
-const API_CONFIG = {
-  BASE_URL: Platform.select({
-    web: 'http://localhost:5253/api',
-    android: 'http://10.2.23.104:5253/api',
-    ios: 'http://localhost:5253/api',
-    default: 'http://10.2.23.104:5253/api'
-  })
-};
+  const API_BASE_URL = Constants.expoConfig.extra.API_BASE_URL;
 
 export default function StudentScreen() {
   const { colorScheme, toggleColorScheme } = useColorScheme();
@@ -34,9 +26,9 @@ export default function StudentScreen() {
       }
       
       const user = JSON.parse(userData);
-      
+      console.log('User Data:', user);
       // Fetch enrolled modules for this student
-      const response = await fetch(`${API_CONFIG.BASE_URL}/Students/${user.id}/classes`, {
+      const response = await fetch(`${API_BASE_URL}/Students/${user.id}/classes`, {
         method: 'GET',
         headers: {
           'Accept': 'application/json',
@@ -92,7 +84,7 @@ export default function StudentScreen() {
         pathname: '/department/studentname',
         params: { 
           studentId: parsedUserData.id,
-          departmentId: parsedUserData.departmentId,  // Add this line
+          departmentId: parsedUserData.departmentId, 
           studentData: JSON.stringify(parsedUserData)
         }
       });
@@ -207,18 +199,6 @@ export default function StudentScreen() {
             </View>
 
             <View style={[styles.cardFooter, { backgroundColor: colors.cardFooter }]}>
-              <View style={styles.progressContainer}>
-                <Text style={[styles.progressLabel, { color: colors.text }]}>Progress</Text>
-                <View style={styles.progressBar}>
-                  <View style={[styles.progressFill, { width: item.progress }]} />
-                </View>
-                <Text style={[styles.progressText, { color: colors.text }]}>{item.progress}</Text>
-              </View>
-
-              <View style={styles.classesContainer}>
-                <Text style={[styles.classesLabel, { color: colors.text }]}>Total Classes</Text>
-                <Text style={[styles.classesCount, { color: colors.text }]}>{item.totalClasses}</Text>
-              </View>
 
               <TouchableOpacity
                 style={styles.actionButton}

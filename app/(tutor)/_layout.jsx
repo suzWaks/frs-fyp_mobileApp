@@ -48,7 +48,7 @@ export default function TutorLayout() {
           ),
         }}
       />
-      <Tabs.Screen
+      {/* <Tabs.Screen
         name="modules"
         options={{
           title: "Modules",
@@ -60,7 +60,7 @@ export default function TutorLayout() {
             />
           ),
         }}
-      />
+      /> */}
       <Tabs.Screen
         name="menu"
         options={{

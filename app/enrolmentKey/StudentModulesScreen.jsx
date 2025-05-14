@@ -5,16 +5,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useColorScheme } from 'nativewind';
 import { Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import Constants from 'expo-constants';
 
-// API configuration
-const API_CONFIG = {
-  BASE_URL: Platform.select({
-    web: 'http://localhost:5253',
-    android: 'http://10.2.23.104:5253',
-    ios: 'http://10.2.23.163:5253',
-    default: 'http://10.2.23.104:5253'
-  }),
-};
+const API_BASE_URL = Constants.expoConfig.extra.API_BASE_URL;
 
 // Add the formatDate function before the component
 const formatDate = (dateString) => {
@@ -69,7 +62,7 @@ export default function StudentModulesScreen() {
         }
 
         // Use the same endpoint as ModulesScreen with the correct departmentId
-        const endpoint = `${API_CONFIG.BASE_URL}/api/Classes/department/${encodeURIComponent(departmentIdToUse)}${year ? `?yearLevel=${year}` : ''}`;
+        const endpoint = `${API_BASE_URL}/api/Classes/department/${encodeURIComponent(departmentIdToUse)}${year ? `?yearLevel=${year}` : ''}`;
         console.log('Fetching from:', endpoint);
 
         const response = await fetch(endpoint);

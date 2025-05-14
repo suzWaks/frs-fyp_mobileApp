@@ -3,6 +3,7 @@ import { View, Text, TextInput, TouchableOpacity, Image, StyleSheet } from "reac
 import * as ImagePicker from "expo-image-picker";
 import Icon from "react-native-vector-icons/Ionicons";
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import Constants from 'expo-constants';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function EditProfileScreen() {
@@ -11,6 +12,7 @@ export default function EditProfileScreen() {
   const [image, setImage] = useState("https://i.imgur.com/6VBx3io.png");
   const [staffData, setStaffData] = useState(null);
   const router = useRouter();
+    const API_BASE_URL = Constants.expoConfig.extra.API_BASE_URL;
   
   // Add the missing isLoading state
   const [isLoading, setIsLoading] = useState(true);
@@ -58,7 +60,7 @@ export default function EditProfileScreen() {
       const storedUserData = await AsyncStorage.getItem('userData');
       const parsedUserData = JSON.parse(storedUserData);
       
-      const response = await fetch(`http://10.2.23.104:5253/api/Staffs/${parsedUserData.staffId}`, {
+      const response = await fetch(`${API_BASE_URL}/Staffs/${parsedUserData.staffId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -96,10 +98,6 @@ export default function EditProfileScreen() {
       setImage(result.assets[0].uri);
     }
   };
-
-  // Remove these duplicate declarations:
-  // const handleSaveChanges = async () => { ... };
-  // const handleSaveChanges = () => { router.back(); };
 
   return (
     <View style={styles.container}>

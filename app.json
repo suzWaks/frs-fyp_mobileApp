@@ -8,7 +8,8 @@
     "scheme": "myapp",
     "userInterfaceStyle": "automatic",
     "extra":{
-      "API_BASE_URL": "http://10.2.23.104:5253/api"
+      "API_BASE_URL": "http://10.2.23.120:5253/api",
+      "API_MODEL_URL": "http://10.2.23.120:5000"
     },
     "newArchEnabled": true,
     "ios": {
@@ -19,6 +20,10 @@
         "light": "./assets/icons/Light.png",
         "dark": "./assets/icons/Dark.png",
         "tinted": "./assets/icons/Tinted.png"
+      },
+      "infoPlist": {
+        "NSCameraUsageDescription": "This app uses the camera for face registration and authentication.",
+        "NSPhotoLibraryUsageDescription": "This app needs access to your photo library to save registration photos."
       }
     },
     "android": {

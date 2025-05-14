@@ -41,9 +41,9 @@ detector = MTCNN()
 DB_CONFIG = {
     'dbname': 'fyp-ams',
     'user': 'postgres',
-    'password': '1234',
+    'password': 'root',
     'host': 'localhost',
-    'port': '5433'
+    'port': '5432'
 }
 
 def preprocess_image(image_bytes):

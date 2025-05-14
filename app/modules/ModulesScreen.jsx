@@ -5,16 +5,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useColorScheme } from 'nativewind';
 import { Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import Constants from 'expo-constants';
 
-// API configuration
-const API_CONFIG = {
-  BASE_URL: Platform.select({
-    web: 'http://localhost:5253',
-    android: 'http://10.2.23.104:5253',
-    ios: 'http://10.2.23.163:5253',
-    default: 'http://10.2.23.104:5253'
-  }),
-};
+  const API_BASE_URL = Constants.expoConfig.extra.API_BASE_URL;
 
 export default function ModulesScreen() {
   const params = useLocalSearchParams();
@@ -53,10 +46,10 @@ export default function ModulesScreen() {
         if (user.role.toLowerCase() === 'student') {
           // Use this endpoint for students:
           // GET /api/Students/{studentId}/classes
-          endpoint = `${API_CONFIG.BASE_URL}/api/Students/${studentId}/classes`;
+          endpoint = `${API_BASE_URL}/api/Students/${studentId}/classes`;
         } else {
           // DAA or HoD - keep existing behavior unchanged
-          endpoint = `${API_CONFIG.BASE_URL}/api/Classes/department/${encodeURIComponent(departmentId)}${year ? `?yearLevel=${year}` : ''}`;
+          endpoint = `${API_BASE_URL}/api/Classes/department/${encodeURIComponent(departmentId)}${year ? `?yearLevel=${year}` : ''}`;
         }
 
         const response = await fetch(endpoint);

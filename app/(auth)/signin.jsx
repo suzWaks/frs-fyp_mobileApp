@@ -9,9 +9,7 @@ import Toast from 'react-native-toast-message';
 const { width, height } = Dimensions.get('window');
 const isSmallDevice = width < 375;
 
-// Get API base URL from expo constants
-const API_BASE_URL = 'http://10.2.23.104:5253/api';
-
+const API_BASE_URL = Constants.expoConfig.extra.API_BASE_URL;
 
 // Configuration
 const API_CONFIG = {
@@ -34,6 +32,8 @@ const ROUTES = {
   PL: '/(tutor)/tutor',
   DEFAULT: '/home'
 };
+
+
 
 export default function SignInScreen() {
   const [email, setEmail] = useState('');
@@ -187,10 +187,10 @@ export default function SignInScreen() {
           role: 'STUDENT',
           departmentId: student.department_Id,
           departmentName: student.department?.department_Name || 'Department Not Assigned',
-          token: token,
           phoneNo: student.phone_No,
           profilePicture: student.profile_PictureURL,
-          moduleIds: student.moduleIds || []
+          moduleIds: student.moduleIds || [],
+          hasFaceData: !!student.faceData && !!student.faceData.faceEmbedding
         };
 
         await handleUserLoginSuccess(userInfo);
@@ -213,14 +213,9 @@ export default function SignInScreen() {
 };
 
 const handleUserLoginSuccess = async (userInfo) => {
-  // Store user data based on remember me preference
-  if (rememberMe) {
-    await AsyncStorage.setItem('userData', JSON.stringify(userInfo));
-  }
-  // if (userInfo.token) {
-  //   await AsyncStorage.setItem('authToken', userInfo.token);
-  // }
 
+  await AsyncStorage.setItem('userData', JSON.stringify(userInfo));
+  
   Toast.show({
     type: 'success',
     text1: 'Login Successful',
@@ -242,7 +237,11 @@ const handleUserLoginSuccess = async (userInfo) => {
         router.replace(ROUTES.DAA);
         break;
       case 'STUDENT':
-        router.replace(ROUTES.STUDENT);
+        if (userInfo.hasFaceData) {
+          router.replace('/(students)/student');
+        } else {
+          router.replace(ROUTES.STUDENT); 
+        }
         break;
       default:
         console.error('Invalid role:', userInfo.role);

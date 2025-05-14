@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, FlatList, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, FlatList, Alert, ActivityIndicator } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useColorScheme } from 'nativewind';
@@ -8,6 +8,7 @@ import AttendanceDialog from '../tutorcomponent/attendanceDialog';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import Constants from 'expo-constants';
+import * as signalR from '@microsoft/signalr';
 
 const statusOptions = [
   { label: "Present", color: "#28a745" },
@@ -15,56 +16,164 @@ const statusOptions = [
   { label: "Leave", color: "#007bff" },
 ];
 
+
 const ModuleReport = () => {
-  const { code, name, instructor } = useLocalSearchParams();
+  const { code, name, instructor, classId } = useLocalSearchParams();
   const [attendanceData, setAttendanceData] = useState([]);  
   const [activeButton, setActiveButton] = useState(null);
   const [isDialogVisible, setIsDialogVisible] = useState(false);
   const [userRole, setUserRole] = useState(null);
   const [userName, setUserName] = useState('');
+  const [userId, setUserId] = useState(null);
+  
   const [loading, setLoading] = useState(true);
   const { colorScheme, toggleColorScheme } = useColorScheme();
   const router = useRouter();
 
+  const [connection, setConnection] = useState(null);
+  const [activeAttendance, setActiveAttendance] = useState(null);
+  const [isAttendanceEnabled, setIsAttendanceEnabled] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [myAttendanceStatus, setMyAttendanceStatus] = useState(null);
+
   const API_BASE_URL = Constants.expoConfig.extra.API_BASE_URL;
   const iconColor = colorScheme === "dark" ? "#D1D5DB" : "#000";
 
+
+
+  // Get user details from AsyncStorage
   useEffect(() => {
     const getUserDetails = async () => {
-      const role = await AsyncStorage.getItem('userRole');
-      const name = await AsyncStorage.getItem('userName');
-      setUserRole(role);
-      setUserName(name);
+      try {
+        const role = await AsyncStorage.getItem('role');
+        const name = await AsyncStorage.getItem('name');
+        const id = await AsyncStorage.getItem('studentId');
+        setUserRole(role);
+        setUserName(name);
+        setUserId(id);
+      } catch (error) {
+        console.error("Error fetching user details:", error);
+      }
     };
     getUserDetails();
   }, []);
 
+    // Set up SignalR connection
   useEffect(() => {
-    const fetchAttendanceData = async () => {
+    if (!classId) return;
+    
+    const setupConnection = async () => {
+      setIsLoading(true);
+      
       try {
-        setLoading(true);
-        const response = await fetch(`${API_BASE_URL}/api/AttendanceRecords/class`);
+        // Check if there's an active attendance session for this class
+        const response = await fetch(`${API_BASE_URL}/Classes/${classId}/activeAttendance`);
+        
         const data = await response.json();
         
-        const formattedRecords = data.map((record) => ({
-          id: record.id,
-          date: new Date(record.date).toLocaleDateString(),
-          time: record.time_Interval,
-          status: record.status === 0 ? "Present" : record.status === 1 ? "Absent" : "Leave",
-          class_Id: record.class_Id,
-        }));
-        
-        setAttendanceData(formattedRecords || []);
+        if (data && data.attendanceId) {
+          setActiveAttendance(data);
+          
+          // Connect to SignalR hub
+          const newConnection = new signalR.HubConnectionBuilder()
+            .withUrl(`${API_BASE_URL}/attendanceHub`)
+            .withAutomaticReconnect()
+            .build();
+          
+          // Handle initial attendance status
+          newConnection.on("InitialAttendanceStatus", (initialStatus) => {
+            if (userId) {
+              const myStatus = initialStatus.find(s => s.studentId === parseInt(userId));
+              if (myStatus) {
+                setMyAttendanceStatus(myStatus.status);
+              }
+            }
+          });
+          
+          // Handle real-time updates
+          newConnection.on("StudentAttendanceUpdated", (update) => {
+            if (update.studentId === parseInt(userId)) {
+              setMyAttendanceStatus(update.status);
+            }
+          });
+          
+          // Handle errors
+          newConnection.on("AttendanceError", (errorMessage) => {
+            Alert.alert("Attendance Error", errorMessage);
+          });
+          
+          // Start connection
+          await newConnection.start();
+          await newConnection.invoke("JoinAttendanceSession", data.attendanceId);
+          
+          setConnection(newConnection);
+          setIsAttendanceEnabled(true);
+        } else {
+          // No active attendance session
+          setIsAttendanceEnabled(false);
+        }
       } catch (error) {
-        console.error('Error fetching attendance data:', error);
-        setAttendanceData([]);
+        console.error("Error setting up attendance connection:", error);
+        setIsAttendanceEnabled(false);
       } finally {
-        setLoading(false);
+        setIsLoading(false);
       }
     };
+    
+    setupConnection();
+    
+    // Polling mechanism to check for active sessions periodically
+    const intervalId = setInterval(setupConnection, 30000); // Check every 30 seconds
+    
+    return () => {
+      clearInterval(intervalId);
+      if (connection) {
+        connection.stop();
+      }
+    };
+  }, [classId, userId]);
 
-    fetchAttendanceData();
-  }, []);
+  useEffect(() => {
+  const fetchAttendanceData = async () => {
+    try {
+      setLoading(true);
+
+      const userData = await AsyncStorage.getItem('userData');
+      if (!userData) throw new Error('User data not found');
+
+      const user = JSON.parse(userData);
+      const userEmail = user.email;
+
+      const response = await fetch(`${API_BASE_URL}/AttendanceRecords/class/${classId}`);
+      const data = await response.json();
+
+      const filteredRecords = [];
+
+      data.forEach((record) => {
+        const matchedStudent = record.students.find(s => s.email === userEmail);
+        if (matchedStudent) {
+          filteredRecords.push({
+            id: record.attendance_Id,
+            date: new Date(record.date).toLocaleDateString(),
+            time: record.time_Interval,
+            status: matchedStudent.status === 0 ? "Present" : matchedStudent.status === 1 ? "Absent" : "Leave",
+            class_Id: record.class_Id,
+          });
+        }
+      });
+
+      setAttendanceData(filteredRecords);
+    } catch (error) {
+      console.error('Error fetching attendance data:', error);
+      setAttendanceData([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  fetchAttendanceData();
+}, [classId]);
+
 
   const handleDownloadReport = async () => {
     const csvContent = [
@@ -109,6 +218,10 @@ const ModuleReport = () => {
 
   const handleBackPress = () => {
     router.replace('/student');
+  };
+
+    const handleDialogClose = () => {
+    setIsDialogVisible(false);
   };
 
   // Calculate summary counts
@@ -160,6 +273,43 @@ const ModuleReport = () => {
       <View style={styles.moduleInfo}>
         <Text style={[styles.moduleCode, { color: colorScheme === "dark" ? "white" : "#7647EB" }]}>{code} - {name}</Text>
         <Text style={[styles.instructor, { color: colorScheme === "dark" ? "white" : "#7647EB" }]}>{instructor}</Text>
+        
+        {/* Active attendance session indicator */}
+        {isLoading ? (
+          <View style={styles.sessionIndicator}>
+            <ActivityIndicator size="small" color="#7647EB" />
+            <Text style={[styles.sessionText, { color: colorScheme === "dark" ? "#aaa" : "#666" }]}>
+              Checking for active sessions...
+            </Text>
+          </View>
+        ) : isAttendanceEnabled ? (
+          <View style={styles.sessionIndicator}>
+            <View style={styles.activeDot} />
+            <Text style={[styles.sessionText, { color: "#4CAF50" }]}>
+              Active attendance session in progress
+            </Text>
+          </View>
+        ) : (
+          <View style={styles.sessionIndicator}>
+            <View style={[styles.inactiveDot]} />
+            <Text style={[styles.sessionText, { color: colorScheme === "dark" ? "#aaa" : "#666" }]}>
+              No active attendance session
+            </Text>
+          </View>
+        )}
+        
+        {/* Show my attendance status if marked */}
+        {myAttendanceStatus && (
+          <View style={styles.myStatusContainer}>
+            <Text style={[
+              styles.myStatusText, 
+              { color: myAttendanceStatus === "Present" ? "#4CAF50" : 
+                      myAttendanceStatus === "Absent" ? "#F44336" : "#2196F3" }
+            ]}>
+              Your status: {myAttendanceStatus}
+            </Text>
+          </View>
+        )}
       </View>
 
       {/* Attendance Summary Card */}
@@ -231,7 +381,7 @@ const ModuleReport = () => {
       ) : (
         <FlatList
           data={attendanceData}
-          keyExtractor={(item) => item.id.toString()}
+          keyExtractor={(item, index) => (item?.id ? item.id.toString() : index.toString())}
           renderItem={({ item }) => (
             <View style={[styles.tableRow, { borderBottomColor: colorScheme === "dark" ? "#333" : "#eee" }]}>
               <Text style={[styles.tableCell, { color: colorScheme === "dark" ? "white" : "black" }]}>
@@ -263,7 +413,12 @@ const ModuleReport = () => {
             styles.applyLeaveButton,
             activeButton === 'applyLeave' && styles.buttonPressed,
           ]}
-          onPress={() => setActiveButton(activeButton === 'applyLeave' ? null : 'applyLeave')}
+          // onPress={() => {
+          //   router.push('/geofencing/page');
+          // }}
+          onPress={() => {
+            router.push('/geofencing/stdFence');
+          }}
         >
           <Text
             style={[
@@ -271,23 +426,26 @@ const ModuleReport = () => {
               activeButton === 'applyLeave' && styles.buttonTextPressed,
             ]}
           >
-            Apply Leave
+            Add Location
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[
             styles.takeAttendanceButton,
             activeButton === 'takeAttendance' && styles.buttonPressed,
+            !isAttendanceEnabled && styles.disabledButton,
           ]}
           onPress={handleTakeAttendancePress}
+          disabled={!isAttendanceEnabled}
         >
           <Text
             style={[
               styles.buttonText,
               activeButton === 'takeAttendance' && styles.buttonTextPressed,
+              !isAttendanceEnabled && styles.disabledButtonText,
             ]}
           >
-            Take Attendance
+            {isAttendanceEnabled ? "Take Attendance" : "No Active Session"}
           </Text>
         </TouchableOpacity>
       </View>
@@ -295,8 +453,11 @@ const ModuleReport = () => {
       {/* Attendance Dialog */}
       <AttendanceDialog
         visible={isDialogVisible}
-        onClose={() => setIsDialogVisible(false)}
+        onClose={handleDialogClose}
         userRole={userRole}
+        attendanceData={activeAttendance}
+        userId={userId}
+        currentStatus={myAttendanceStatus}
       />
     </View>
   );
@@ -306,6 +467,11 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 16,
+  },
+    sessionIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
   },
   loadingContainer: {
     flex: 1,
@@ -461,6 +627,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     paddingVertical: 20,
+  },
+    disabledButton: {
+    borderColor: '#cccccc',
+    backgroundColor: '#f5f5f5',
   },
   applyLeaveButton: {
     backgroundColor: 'transparent',

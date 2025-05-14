@@ -3,14 +3,19 @@ import { StyleSheet,Text,TouchableOpacity,View,Alert,Image,Dimensions,} from 're
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as FileSystem from 'expo-file-system';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import Constants from 'expo-constants';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 
 const { width } = Dimensions.get('window');
 
 export default function AttendanceScreen() {
-  const [facing, setFacing] = useState('back');
+  const [facing, setFacing] = useState('front');
   const [capturedImageUri, setCapturedImageUri] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const cameraRef = useRef(null);
+  const router = useRouter();
+
+  const API_MODEL_URL = Constants.expoConfig.extra.API_MODEL_URL;
 
   const [permission, requestPermission] = useCameraPermissions();
 
@@ -49,7 +54,7 @@ export default function AttendanceScreen() {
         encoding: FileSystem.EncodingType.Base64,
       });
 
-      const response = await fetch('http://10.2.23.104:5000/compare', {
+      const response = await fetch(`${API_MODEL_URL}/compare`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -63,8 +68,13 @@ export default function AttendanceScreen() {
         const StudentName = result.best_match.StudentName || 'Unknown';
         Alert.alert(
           'Success',
-          `Attendance marked for:\n${result.best_match.StudentName}`,
-          [{ text: 'OK' }]
+          `Facial recognition successful for:\n${result.best_match.StudentName}`,
+          [
+            {
+              text: 'OK',
+              onPress: () => router.push('/geofencing/stdFence'),
+            },
+          ]
         );
       } else {
         Alert.alert('No Match', result.message || 'Face not recognized.');

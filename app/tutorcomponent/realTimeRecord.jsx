@@ -1,219 +1,510 @@
-import React from "react";
-import { View, Text, FlatList, Image } from "react-native";
+//RealTimeRecord.jsx
+import React, { useState, useEffect, useRef } from "react";
+import * as signalR from '@microsoft/signalr';
+import { 
+  View, 
+  Text,  
+  TouchableOpacity, 
+  FlatList, 
+  Alert,
+  ActivityIndicator,
+  SafeAreaView,
+  Platform,
+  StatusBar
+} from "react-native";
+import { FontAwesome5 } from "@expo/vector-icons";
 import { useColorScheme } from "nativewind";
-import Svg, { Circle } from "react-native-svg";
-import { Dimensions } from "react-native";
-import { Ionicons } from '@expo/vector-icons';
+import { useRouter, useLocalSearchParams } from "expo-router";
+import Constants from "expo-constants";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-const screenWidth = Dimensions.get("window").width;
+const API_BASE_URL = Constants.expoConfig.extra.API_BASE_URL;
 
-export default function RealTimeRecord() {
+const RealTimeRecord = () => {
   const { colorScheme } = useColorScheme();
+  const router = useRouter();
+  const params = useLocalSearchParams();
+  const insets = useSafeAreaInsets();
+  
+  // State for attendance session data
+  const [attendanceSession, setAttendanceSession] = useState(null);
+  const [timeLeft, setTimeLeft] = useState(0); 
+  const [students, setStudents] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [marked, setMarked] = useState({});
+  const timerRef = useRef(null);
+  const [classDetails, setClassDetails] = useState(null);
+  const [connection, setConnection] = useState(null);
+  const [realTimeMarked, setRealTimeMarked] = useState({});
 
-  const data = [
-    {
-      id: 1,
-      name: "Phurba",
-      avatar:
-        "https://media.istockphoto.com/id/1349231567/vector/young-man-anime-style-character-anime-boy-vector.jpg?s=612x612&w=0&k=20&c=92lg_s72y-gYEfVoWKlq1bzmbWNNI6anQwyhwpMEMiw=",
-      status: "correct",
-    },
-    {
-      id: 2,
-      name: "Aniketh Pawdel",
-      avatar:
-        "https://w7.pngwing.com/pngs/531/417/png-transparent-anime-manga-boy-black-hair-human-boy.png",
-      status: "correct",
-    },
-    {
-      id: 3,
-      name: "Dechen Pelden",
-      avatar:
-        "https://static.vecteezy.com/system/resources/thumbnails/034/924/233/small_2x/ai-generated-a-girl-looking-out-into-the-clouds-anime-style-ai-generative-photo.jpeg",
-      status: "correct",
-    },
-    {
-      id: 4,
-      name: "Depashna Pradhan",
-      avatar:
-        "https://img.freepik.com/premium-photo/portrait-cute-anime-girl-with-black-hair-against-background-beautiful-serene-sky-with-clouds_646632-11707.jpg",
-      status: "correct",
-    },
-    {
-      id: 5,
-      name: "Jigme Phuentsho Wangyel",
-      avatar:
-        "https://static.vecteezy.com/system/resources/previews/034/210/205/non_2x/3d-cartoon-baby-genius-photo.jpg",
-      status: "wrong",
-    },
-    {
-      id: 6,
-      name: "Jimpa Jamtsho",
-      avatar:
-        "https://static.vecteezy.com/system/resources/thumbnails/028/794/707/small_2x/cartoon-cute-school-boy-photo.jpg",
-      status: "correct",
-    },
-  ];
+useEffect(() => {
+    if (!attendanceSession?.attendanceId) return;
 
-  const correctCount = data.filter((item) => item.status === "correct").length;
-  const totalCount = data.length;
-  const correctPercentage = correctCount / totalCount;
-  const strokeWidth = 15;
-  const radius = 35;
-  const circumference = 2 * Math.PI * radius;
+    const newConnection = new signalR.HubConnectionBuilder()
+      .withUrl(`${API_BASE_URL}/attendanceHub`)
+      .withAutomaticReconnect()
+      .build();
 
-  const renderItem = ({ item }) => (
-    <View className="flex-row items-center p-3 border-b border-gray-300">
-      <Image source={{ uri: item.avatar }} className="w-10 h-10 rounded-full" />
-      <View className="ml-3 flex-1">
-        <Text
-          className={`text-base font-bold ${
-            colorScheme === "dark" ? "text-gray-500" : "text-black"
-          }`}
-        >
-          {item.name}
-        </Text>
-      </View>
-      <View className={`w-8 h-8 items-center justify-center rounded-md ${
-        item.status === "correct" ? "bg-green-200" : "bg-red-500"
+    // Handle initial attendance status
+    newConnection.on("InitialAttendanceStatus", (initialStatus) => {
+      const initialStatusMap = initialStatus.reduce((acc, status) => {
+        acc[status.studentId] = status.status;
+        return acc;
+      }, {});
+      setRealTimeMarked(initialStatusMap);
+    });
+
+    // Handle real-time updates
+    newConnection.on("StudentAttendanceUpdated", (update) => {
+      setRealTimeMarked(prev => ({
+        ...prev,
+        [update.studentId]: update.status
+      }));
+    });
+
+    // Handle errors
+    newConnection.on("AttendanceError", (errorMessage) => {
+      Alert.alert("Attendance Error", errorMessage);
+    });
+
+    // Start connection and join attendance session group
+    newConnection.start()
+      .then(() => {
+        newConnection.invoke("JoinAttendanceSession", attendanceSession.attendanceId);
+        setConnection(newConnection);
+      })
+      .catch(error => {
+        console.error("SignalR connection error:", error);
+      });
+
+    // Cleanup on unmount
+    return () => {
+      if (newConnection) {
+        newConnection.invoke("LeaveAttendanceSession", attendanceSession.attendanceId);
+        newConnection.stop();
+      }
+    };
+  }, [attendanceSession?.attendanceId]);
+
+  // Try to parse attendance data from params
+  useEffect(() => {
+    const parseAttendanceData = () => {
+      try {
+        if (params.attendanceData) {
+          const sessionData = JSON.parse(params.attendanceData);
+          setAttendanceSession(sessionData);
+          
+          // Calculate initial time left
+          const expiryTime = new Date(sessionData.expiryTime).getTime();
+          const now = new Date().getTime();
+          const timeLeftMs = Math.max(0, expiryTime - now);
+          setTimeLeft(Math.floor(timeLeftMs / 1000));
+        } else {
+          console.log("No attendance data found in params");
+          Alert.alert(
+            "Warning", 
+            "No attendance session data found. Some features may not work correctly.",
+            [{ text: "OK" }]
+          );
+        }
+      } catch (error) {
+        console.error("Error parsing attendance data:", error);
+      }
+    };
+
+    parseAttendanceData();
+  }, [params.attendanceData]);
+
+  // Setup countdown timer
+  useEffect(() => {
+    let timer = null;
+    
+    if (timeLeft > 0) {
+      timer = setInterval(() => {
+        setTimeLeft(prev => {
+          if (prev <= 1) {
+            clearInterval(timer);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+
+    return () => {
+      if (timer) {
+        clearInterval(timer);
+      }
+    };
+  }, [timeLeft]);
+
+  // Format remaining time as MM:SS
+  const formatTimeLeft = () => {
+    const minutes = Math.floor(timeLeft / 60);
+    const seconds = timeLeft % 60;
+    return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+  };
+
+  // Helper function to get dummy students (used when API fails)
+  const getDummyStudents = () => {
+    return [
+      { student_Id: 1, name: "John Doe", matriculation_Number: "A12345" },
+      { student_Id: 2, name: "Jane Smith", matriculation_Number: "A12346" },
+      { student_Id: 3, name: "Bob Johnson", matriculation_Number: "A12347" }
+    ];
+  };
+
+  // Fetch students who should be in this class
+  const fetchStudents = async () => {
+    if (!attendanceSession?.attendanceId) return;
+    
+    setLoading(true);
+    try {
+      const classId = attendanceSession?.classId;
+      const response = await fetch(`${API_BASE_URL}/Classes/${classId}/students`);
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch students');
+      }
+      
+      const data = await response.json();
+      setStudents(data.length > 0 ? data : getDummyStudents());
+    } catch (error) {
+      console.error("Error fetching students:", error);
+      Alert.alert("Error", "Failed to fetch students. Using placeholder data.");
+      setStudents(getDummyStudents());
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Call fetchStudents when attendanceSession changes
+  useEffect(() => {
+    let isMounted = true;
+
+    if (attendanceSession?.attendanceId && isMounted) {
+      fetchStudents();
+    }
+
+    return () => {
+      isMounted = false;
+    };
+  }, [attendanceSession?.attendanceId]);
+
+  // Mark a student as present
+  const markStudent = async (studentId, status = "Present") => {
+    if (!connection) return;
+
+    try {
+      // Local optimistic update
+      setMarked(prev => ({
+        ...prev,
+        [studentId]: status
+      }));
+
+      // Send via SignalR
+      await connection.invoke("MarkStudentAttendance", 
+        attendanceSession.attendanceId,
+        studentId, 
+        status
+      );
+    } catch (error) {
+      console.error("Error marking student:", error);
+      // Revert local state on failure
+      setMarked(prev => {
+        const newState = {...prev};
+        delete newState[studentId];
+        return newState;
+      });
+    }
+  };
+
+  const combinedMarked = { ...marked, ...realTimeMarked };
+
+const handleSessionEnd = async () => {
+    // Update attendance to set isActive to false
+    try {
+      const response = await fetch(`${API_BASE_URL}/AttendanceRecords/flag/${attendanceSession.attendanceId}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          isActive: false
+        })
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to end session: ${errorText}`);
+      }
+
+      console.log("Session marked as inactive");
+
+      // Show the session end alert
+      Alert.alert(
+        "Session Ended",
+        "The attendance session has ended. Would you like to view the summary?",
+        [
+          {
+            text: "View Summary",
+            onPress: () => {
+              // Navigate to summary page, passing the attendance ID
+              router.push({
+                pathname: "/tutorcomponent/attendanceSummary",
+                params: { attendanceId: attendanceSession?.attendanceId }
+              });
+            }
+          },
+          {
+            text: "Close",
+            onPress: () =>  router.replace('(tutor)/tutor'),
+            style: "cancel"
+          }
+        ]
+      );
+    } catch (error) {
+      console.error("Error ending session:", error);
+      Alert.alert("Error", "Failed to end the session.");
+      return;
+    }
+  };
+
+  // End session early
+  const endSessionEarly = () => {
+    Alert.alert(
+      "End Session",
+      "Are you sure you want to end this attendance session early?",
+      [
+        {
+          text: "Yes",
+          onPress: () => {
+            clearInterval(timerRef.current);
+            setTimeLeft(0);
+            handleSessionEnd();
+          }
+        },
+        {
+          text: "No",
+          style: "cancel"
+        }
+      ]
+    );
+  };
+
+  useEffect(() => {
+  const fetchClassDetails = async () => {
+    if (!attendanceSession?.classId) return;
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/Classes/${attendanceSession.classId}`);
+      if (!response.ok) {
+        throw new Error("Failed to fetch class details");
+      }
+
+      const data = await response.json();
+      setClassDetails(data);
+    } catch (error) {
+      console.error("Error fetching class details:", error);
+    }
+  };
+
+  fetchClassDetails();
+}, [attendanceSession?.classId]);
+
+
+  // Render item for student list
+  const renderStudentItem = ({ item }) => {
+    const isMarked = marked[item.student_Id];
+    
+    return (
+      <View className={`flex-row justify-between items-center p-4 border-b ${
+        colorScheme === "dark" ? "border-gray-700" : "border-gray-200"
       }`}>
-        {item.status === "correct" ? (
-          <Ionicons name="checkmark" size={20} color="#28a745" />
-        ) : (
-          <Ionicons name="close" size={20} color="#FFFFFF" />
-        )}
+        <View className="flex-1">
+          <Text className={`font-semibold ${
+            colorScheme === "dark" ? "text-white" : "text-black"
+          }`}>
+            {item.name}
+          </Text>
+          <Text className={
+            colorScheme === "dark" ? "text-gray-400" : "text-gray-600"
+          }>
+            Std.Id: {item.student_Id}
+          </Text>
+        </View>
+        
+        <View className="flex-row">
+          <TouchableOpacity 
+            className={`px-3 py-2 rounded-lg mr-2 ${
+              isMarked === "Present" 
+                ? "bg-green-500" 
+                : colorScheme === "dark" 
+                  ? "bg-gray-700" 
+                  : "bg-gray-200"
+            }`}
+            onPress={() => markStudent(item.student_Id, "Present")}
+            disabled={timeLeft === 0}
+          >
+            <FontAwesome5 name="check" size={16} color={
+              isMarked === "Present" ? "white" : "gray"
+            } />
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            className={`px-3 py-2 rounded-lg ${
+              isMarked === "Absent" 
+                ? "bg-red-500" 
+                : colorScheme === "dark" 
+                  ? "bg-gray-700" 
+                  : "bg-gray-200"
+            }`}
+            onPress={() => markStudent(item.student_Id, "Absent")}
+            disabled={timeLeft === 0}
+          >
+            <FontAwesome5 name="times" size={16} color={
+              isMarked === "Absent" ? "white" : "gray"
+            } />
+          </TouchableOpacity>
+        </View>
       </View>
-    </View>
-  );
+    );
+  };
+
+  // Show alert when time runs out
+  useEffect(() => {
+    if (timeLeft === 0 && attendanceSession) {
+      handleSessionEnd();
+    }
+  }, [timeLeft, attendanceSession]);
+
+  // Create a style object for safe area insets
+  const containerStyle = {
+    flex: 1,
+    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
+    paddingBottom: insets.bottom,
+    paddingLeft: insets.left,
+    paddingRight: insets.right,
+    backgroundColor: colorScheme === "dark" ? "#111827" : "#f3f4f6"
+  };
 
   return (
-    <View
-      className={`flex-1 ${
-        colorScheme === "dark" ? "bg-gray-900" : "bg-white"
-      } p-4`}
-    >
-      <View>
-        <Text
-          className={`text-2xl font-bold text-center mb-2 ${
-            colorScheme === "dark" ? "text-gray-400" : "text-black"
-          }`}
-        >
-          CTE411
+    <SafeAreaView style={containerStyle}>
+      {/* Header with attendance info */}
+      <View className={`p-4 ${
+        colorScheme === "dark" ? "bg-gray-800" : "bg-white"
+      }`}>
+        <Text className={`text-xl font-bold ${
+          colorScheme === "dark" ? "text-white" : "text-black"
+        }`}>
+          Real-Time Attendance
         </Text>
+        
+        {attendanceSession ? (
+          <>
+            <View className="flex-row justify-between items-center mt-2">
+              <Text className={colorScheme === "dark" ? "text-primary-300" : "text-primary"}>
+                {classDetails?.class_Name || "Loading..."}
+              </Text>
+              <Text className={
+                colorScheme === "dark" ? "text-gray-300" : "text-gray-700"
+              }>
+                {attendanceSession.locationName}
+              </Text>
 
-        {/* Attendance Ring */}
-        <View className="items-center relative">
-          <Svg width={150} height={150} viewBox="0 0 100 100">
-            {/* Background Circle */}
-            <Circle
-              cx="50"
-              cy="50"
-              r={radius}
-              stroke="#E9D5FF"
-              strokeWidth={strokeWidth}
-              fill="none"
-            />
-            {/* Progress Circle */}
-            <Circle
-              cx="50"
-              cy="50"
-              r={radius}
-              stroke="#7C3AED"
-              strokeWidth={strokeWidth}
-              fill="none"
-              strokeDasharray={`${
-                correctPercentage * circumference
-              } ${circumference}`}
-              strokeLinecap="round"
-            />
-          </Svg>
-
-          {/* Attendance Count Text in Center */}
-          <View
-            className="absolute top-1/2 left-1/2"
-            style={{ transform: [{ translateX: -20 }, { translateY: -10 }] }}
-          >
-            <Text
-              className={`text-xl font-bold ${
-                colorScheme === "dark" ? "text-gray-400" : "text-black"
-              }`}
-            >
-              {correctCount}/{totalCount}
-            </Text>
-          </View>
+            </View>
+            <View className="flex-row justify-between items-center mt-2">
+              
+                            <Text className={colorScheme === "dark" ? "text-primary-300" : "text-primary"}>
+                {classDetails?.module_Code || ""}
+              </Text>
+              <Text className={
+                colorScheme === "dark" ? "text-gray-300" : "text-gray-700"
+              }>
+                {attendanceSession.timeInterval}
+              </Text>
+            </View>
+            
+            <View className="flex-row justify-between items-center mt-2">
+              <Text className={`text-lg font-semibold ${
+                timeLeft === 0 
+                  ? "text-red-500" 
+                  : timeLeft < 60 
+                    ? "text-orange-500" 
+                    : colorScheme === "dark" 
+                      ? "text-green-400" 
+                      : "text-green-600"
+              }`}>
+                Time Left: {formatTimeLeft()}
+              </Text>
+              
+              <TouchableOpacity 
+                className={`px-3 py-1 rounded-lg ${
+                  colorScheme === "dark" ? "bg-red-800" : "bg-red-500"
+                }`}
+                onPress={endSessionEarly}
+              >
+                <Text className="text-white font-medium">End Session</Text>
+              </TouchableOpacity>
+            </View>
+          </>
+        ) : (
+          <Text className={`mt-2 ${
+            colorScheme === "dark" ? "text-gray-400" : "text-gray-600"
+          }`}>
+            Loading session data...
+          </Text>
+        )}
+      </View>
+      
+      {/* Student List */}
+      {loading ? (
+        <View className="flex-1 justify-center items-center">
+          <ActivityIndicator 
+            size="large" 
+            color={colorScheme === "dark" ? "#ffffff" : "#000000"} 
+          />
+          <Text className={`mt-4 ${
+            colorScheme === "dark" ? "text-gray-300" : "text-gray-700"
+          }`}>
+            Loading students...
+          </Text>
         </View>
-
-        <Text
-          className={`text-lg text-center mb-1 ${
-            colorScheme === "dark" ? "text-gray-500" : "text-black"
-          }`}
-        >
-          10:00 – 12:00 am
+      ) : (
+        <FlatList
+          data={students}
+          renderItem={renderStudentItem}
+          keyExtractor={item => item.student_Id.toString()}
+          contentContainerStyle={{flexGrow: 1}}
+          ListEmptyComponent={
+            <View className="flex-1 justify-center items-center p-10">
+              <Text className={`text-center text-lg ${
+                colorScheme === "dark" ? "text-gray-400" : "text-gray-600"
+              }`}>
+                No students found for this class.
+              </Text>
+            </View>
+          }
+        />
+      )}
+      
+      {/* Status bar */}
+      <View className={`p-4 flex-row justify-between items-center ${
+        colorScheme === "dark" ? "bg-gray-800" : "bg-white"
+      }`}>
+        <Text className={
+          colorScheme === "dark" ? "text-gray-300" : "text-gray-700"
+        }>
+          Total: {students.length}
         </Text>
-        <Text
-          className={`text-lg text-center mb-6 ${
-            colorScheme === "dark" ? "text-gray-500" : "text-black"
-          }`}
-        >
-          10th June, 2024
-        </Text>
-        <Text
-          className={`text-xl font-bold mb-4 ${
-            colorScheme === "dark" ? "text-gray-400" : "text-black"
-          }`}
-        >
-          Real Time Record
+        <Text className={
+          colorScheme === "dark" ? "text-green-400" : "text-green-600"
+        }>
+          Marked: {Object.keys(marked).length}
         </Text>
       </View>
-
-      {/* List of Members */}
-      <FlatList
-        data={data}
-        renderItem={renderItem}
-        keyExtractor={(item) => item.id.toString()}
-        contentContainerStyle={{ paddingBottom: 20 }}
-        className="border border-gray-300 rounded-lg mb-5"
-      />
-
-      {/* Attendance Summary */}
-      <View
-        className={`p-4 rounded-lg ${
-          colorScheme === "dark" ? "bg-gray-800" : "bg-gray-200"
-        }`}
-      >
-        <View className="flex-row justify-between">
-          <Text
-            className={`text-base ${
-              colorScheme === "dark" ? "text-gray-500" : "text-black"
-            }`}
-          >
-            Total present:
-          </Text>
-          <Text
-            className={`text-base font-bold ${
-              colorScheme === "dark" ? "text-gray-400" : "text-black"
-            }`}
-          >
-            {correctCount} members
-          </Text>
-        </View>
-        <View className="flex-row justify-between mt-2">
-          <Text
-            className={`text-base ${
-              colorScheme === "dark" ? "text-gray-500" : "text-black"
-            }`}
-          >
-            Total absent:
-          </Text>
-          <Text
-            className={`text-base font-bold ${
-              colorScheme === "dark" ? "text-gray-400" : "text-black"
-            }`}
-          >
-            {totalCount - correctCount} members
-          </Text>
-        </View>
-      </View>
-    </View>
+    </SafeAreaView>
   );
-}
+};
+
+export default RealTimeRecord;

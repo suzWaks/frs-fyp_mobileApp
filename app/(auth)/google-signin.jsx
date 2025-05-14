@@ -20,19 +20,21 @@ const ROUTES = {
   DEFAULT: '/home'
 };
 
-const API_CONFIG = {
-  BASE_URL: Platform.select({
-    web: 'http://localhost:5253/api',
-    android: 'http://10.2.23.104:5253/api',
-    ios: 'http://10.2.4.216:5253/api',
-    default: 'http://10.2.23.104:5253/api'
-  }),
-  ENDPOINTS: {
-    STAFFS: '/Staffs',
-    ROLES: '/Roles',
-    STUDENTS: '/Students'
-  }
-};
+const API_BASE_URL = Constants.expoConfig.extra.API_BASE_URL;
+
+// const API_CONFIG = {
+//   BASE_URL: Platform.select({
+//     web: 'http://localhost:5253/api',
+//     android: 'http://10.2.23.179:5253/api',
+//     ios: 'http://10.2.23.179:5253/api',
+//     default: 'http://10.2.23.179:5253/api'
+//   }),
+//   ENDPOINTS: {
+//     STAFFS: '/Staffs',
+//     ROLES: '/Roles',
+//     STUDENTS: '/Students'
+//   }
+// };
 
 export default function GoogleSignInScreen() {
   const [email, setEmail] = useState('');
@@ -43,7 +45,7 @@ export default function GoogleSignInScreen() {
   useEffect(() => {
     const fetchRoles = async () => {
       try {
-        const response = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.ROLES}`);
+        const response = await fetch(`${API_BASE_URL}/Roles`);
         const roles = await response.json();
         
         // Create ROLE_MAP dynamically
@@ -80,8 +82,8 @@ export default function GoogleSignInScreen() {
       setLoading(true);
       const trimmedEmail = email.toLowerCase().trim();
       
-      const staffEndpoint = `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.STAFFS}`;
-      const studentEndpoint = `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.STUDENTS}`;
+      const staffEndpoint = `${API_BASE_URL}/Staffs`;
+      const studentEndpoint = `${API_BASE_URL}/Students`;
       
       // Check staff first
       const staffResponse = await fetch(staffEndpoint);

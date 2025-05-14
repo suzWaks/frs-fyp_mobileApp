@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import { useColorScheme } from 'nativewind';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Constants from 'expo-constants';
 
 export default function HomeScreen() {
   const { colorScheme, setColorScheme } = useColorScheme();
@@ -12,6 +13,8 @@ export default function HomeScreen() {
   const [userData, setUserData] = useState(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
+
+  const API_BASE_URL = Constants.expoConfig.extra.API_BASE_URL;
 
   // Theme colors - Move these up before they're used
   const isDarkMode = colorScheme === 'dark';
@@ -65,9 +68,9 @@ export default function HomeScreen() {
   useEffect(() => {
     const getDepartments = async () => {
       try {
-        const response = await fetch('http://10.2.23.104:5253/api/Departments');
+        const response = await fetch(`${API_BASE_URL}/Departments`);
         const data = await response.json();
-        console.log('Department data:', data); // Check the data structure
+        console.log('Department data:', data); 
         setDepartments(data);
       } catch (error) {
         console.error('Error fetching departments:', error);
@@ -169,7 +172,7 @@ export default function HomeScreen() {
                 >
                   <Image
                     source={{ 
-                      uri: `http://localhost:5253/api/Departments/image/${dept.departmentId}` 
+                      uri: `${API_BASE_URL}/Departments/image/${dept.departmentId}` 
                     }}
                     style={styles.iconPlaceholder}
                   />
