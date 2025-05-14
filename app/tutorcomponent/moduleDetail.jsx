@@ -134,7 +134,7 @@ export default function ModuleDetails() {
           {/* Module Card*/}
           {moduleDetails && (
             <View
-              className={`mb-4 rounded-lg overflow-hidden ${
+              className={`mb-4 rounded-[10px] overflow-hidden ${
                 colorScheme === "dark" ? "bg-gray-800" : "bg-white"
               }`}
               style={{
@@ -202,7 +202,7 @@ export default function ModuleDetails() {
 
           {/* Students List */}
           <View
-            className={`mb-4 rounded-lg overflow-hidden p-4 ${
+            className={`mb-4 rounded-[10px] overflow-hidden p-4 ${
               colorScheme === "dark" ? "bg-gray-800" : "bg-white"
             }`}
             style={{

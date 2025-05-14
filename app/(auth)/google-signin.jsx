@@ -23,9 +23,9 @@ const ROUTES = {
 const API_CONFIG = {
   BASE_URL: Platform.select({
     web: 'http://localhost:5253/api',
-    android: 'http://10.2.4.216:5253/api',
-    ios: 'http://10.2.4.216:5253/api',
-    default: 'http://10.2.4.216:5253/api'
+    android: 'http://10.2.24.196:5253/api',
+    ios: 'http://10.2.24.196:5253/api',
+    default: 'http://10.2.24.196:5253/api'
   }),
   ENDPOINTS: {
     STAFFS: '/Staffs',

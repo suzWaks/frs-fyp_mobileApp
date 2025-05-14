@@ -17,7 +17,7 @@ import moment from "moment";
 import { useColorScheme } from "nativewind";
 import * as WebBrowser from "expo-web-browser";
 import Constants from "expo-constants";
-import Toast from 'react-native-toast-message';
+import Toast from "react-native-toast-message";
 
 const statusOptions = [
   { label: "Present", value: "Present", color: "#28a745" },
@@ -61,10 +61,10 @@ export default function DayWiseReport() {
         `${API_BASE_URL}/AttendanceRecords/class/${class_Id}`
       );
       if (!response.ok) throw new Error("Failed to fetch attendance data");
-      
+
       const data = await response.json();
       setAttendanceRecords(data);
-      
+
       if (data.length === 0) {
         setStudents([]);
         setTimeSlots([]);
@@ -73,10 +73,10 @@ export default function DayWiseReport() {
     } catch (error) {
       console.error("Error fetching data:", error);
       Toast.show({
-        type: 'error',
-        text1: 'Error',
-        text2: 'Failed to fetch attendance data',
-        position: 'bottom',
+        type: "error",
+        text1: "Error",
+        text2: "Failed to fetch attendance data",
+        position: "bottom",
       });
     } finally {
       setLoading(false);
@@ -86,12 +86,14 @@ export default function DayWiseReport() {
   const updateTimeSlots = () => {
     const formattedDate = moment(date).format("YYYY-MM-DD");
     const recordsForDate = attendanceRecords.filter(
-      record => moment(record.date).format("YYYY-MM-DD") === formattedDate
+      (record) => moment(record.date).format("YYYY-MM-DD") === formattedDate
     );
-    
-    const uniqueTimeSlots = [...new Set(recordsForDate.map(record => record.time_Interval))];
+
+    const uniqueTimeSlots = [
+      ...new Set(recordsForDate.map((record) => record.time_Interval)),
+    ];
     setTimeSlots(uniqueTimeSlots);
-    
+
     if (uniqueTimeSlots.length === 0) {
       setStudents([]);
       setSelectedTime("Select Time");
@@ -100,26 +102,33 @@ export default function DayWiseReport() {
 
   const fetchStudentsForDateTime = async () => {
     if (selectedTime === "Select Time" || !date) return;
-    
+
     try {
       setLoading(true);
       const formattedDate = moment(date).format("YYYY-MM-DD");
       const record = attendanceRecords.find(
-        r => 
-          moment(r.date).format("YYYY-MM-DD") === formattedDate && 
+        (r) =>
+          moment(r.date).format("YYYY-MM-DD") === formattedDate &&
           r.time_Interval === selectedTime
       );
-      
+
       if (record) {
         const formattedStudents = record.students.map((student) => {
           let status;
-          switch(student.status) {
-            case 0: status = "Present"; break;
-            case 1: status = "Absent"; break;
-            case 2: status = "Leave"; break;
-            default: status = "Present";
+          switch (student.status) {
+            case 0:
+              status = "Present";
+              break;
+            case 1:
+              status = "Absent";
+              break;
+            case 2:
+              status = "Leave";
+              break;
+            default:
+              status = "Present";
           }
-          
+
           return {
             studentId: student.studentId,
             studentNumber: student.studentId.toString(),
@@ -128,7 +137,7 @@ export default function DayWiseReport() {
             statusId: student.statusId,
           };
         });
-        
+
         setStudents(formattedStudents);
         setCurrentAttendanceId(record.attendance_Id);
       } else {
@@ -137,10 +146,10 @@ export default function DayWiseReport() {
     } catch (error) {
       console.error("Error fetching students:", error);
       Toast.show({
-        type: 'error',
-        text1: 'Error',
-        text2: 'Failed to fetch student data',
-        position: 'bottom',
+        type: "error",
+        text1: "Error",
+        text2: "Failed to fetch student data",
+        position: "bottom",
       });
     } finally {
       setLoading(false);
@@ -150,16 +159,17 @@ export default function DayWiseReport() {
   const handleDownloadReport = async () => {
     if (students.length === 0) {
       Toast.show({
-        type: 'info',
-        text1: 'No Data',
-        text2: 'There is no data to download',
-        position: 'bottom',
+        type: "info",
+        text1: "No Data",
+        text2: "There is no data to download",
+        position: "bottom",
       });
       return;
     }
 
     const formattedDate = moment(date).format("MM/DD/YYYY");
-    const formattedTime = selectedTime === "Select Time" ? "All Times" : selectedTime;
+    const formattedTime =
+      selectedTime === "Select Time" ? "All Times" : selectedTime;
 
     const csvContent = [
       ["Attendance Report"],
@@ -172,7 +182,7 @@ export default function DayWiseReport() {
         status,
       ]),
     ]
-      .map(row => row.join(","))
+      .map((row) => row.join(","))
       .join("\n");
 
     if (Platform.OS === "web") {
@@ -182,7 +192,12 @@ export default function DayWiseReport() {
       return;
     }
 
-    const fileUri = FileSystem.documentDirectory + `Attendance_Report_${formattedDate.replace(/\//g, "-")}_${formattedTime.replace(/[: ]/g, "-")}.csv`;
+    const fileUri =
+      FileSystem.documentDirectory +
+      `Attendance_Report_${formattedDate.replace(
+        /\//g,
+        "-"
+      )}_${formattedTime.replace(/[: ]/g, "-")}.csv`;
 
     try {
       await FileSystem.writeAsStringAsync(fileUri, csvContent, {
@@ -197,18 +212,18 @@ export default function DayWiseReport() {
         });
       } else {
         Toast.show({
-          type: 'error',
-          text1: 'Error',
-          text2: 'Sharing is not available on this device',
-          position: 'bottom',
+          type: "error",
+          text1: "Error",
+          text2: "Sharing is not available on this device",
+          position: "bottom",
         });
       }
     } catch (error) {
       Toast.show({
-        type: 'error',
-        text1: 'Error',
-        text2: 'Could not save the file',
-        position: 'bottom',
+        type: "error",
+        text1: "Error",
+        text2: "Could not save the file",
+        position: "bottom",
       });
       console.error(error);
     }
@@ -254,18 +269,18 @@ export default function DayWiseReport() {
       setStudents(updatedStudents);
       setModalVisible(false);
       Toast.show({
-        type: 'success',
-        text1: 'Success',
-        text2: 'Attendance status updated successfully',
-        position: 'bottom',
+        type: "success",
+        text1: "Success",
+        text2: "Attendance status updated successfully",
+        position: "bottom",
       });
     } catch (error) {
       console.error("Error updating attendance status:", error);
       Toast.show({
-        type: 'error',
-        text1: 'Error',
-        text2: 'Failed to update attendance status',
-        position: 'bottom',
+        type: "error",
+        text1: "Error",
+        text2: "Failed to update attendance status",
+        position: "bottom",
       });
     }
   };
@@ -277,13 +292,6 @@ export default function DayWiseReport() {
     setShowTimeDropdown(false);
     setStudents([]);
     updateTimeSlots();
-    Toast.show({
-      type: 'success',
-      text1: 'Reset',
-      text2: 'Filters have been reset',
-      position: 'bottom',
-      visibilityTime: 1500,
-    });
   };
 
   const handleTimeSelect = (time) => {
@@ -301,13 +309,17 @@ export default function DayWiseReport() {
   };
 
   const getStatusColor = (status) => {
-    const option = statusOptions.find(opt => opt.value === status);
+    const option = statusOptions.find((opt) => opt.value === status);
     return option ? option.color : "#000";
   };
 
   if (loading) {
     return (
-      <View className={`flex-1 justify-center items-center ${colorScheme === "dark" ? "bg-gray-800" : "bg-white"}`}>
+      <View
+        className={`flex-1 justify-center items-center ${
+          colorScheme === "dark" ? "bg-gray-800" : "bg-white"
+        }`}
+      >
         <Text>Loading...</Text>
       </View>
     );
@@ -315,8 +327,22 @@ export default function DayWiseReport() {
 
   return (
     <>
-      <View className={`flex-1 p-4 ${colorScheme === "dark" ? "bg-gray-800" : "bg-white"}`}>
-        <View className="flex-row justify-end items-center mb-6">
+      <View
+        className={`flex-1 p-4 ${
+          colorScheme === "dark" ? "bg-gray-800" : "bg-white"
+        }`}
+      >
+        <View className="items-center">
+          <Text
+            className={`text-lg font-bold ${
+              colorScheme === "dark" ? "text-gray-400" : "text-black"
+            }`}
+          >
+            {"Daily Details"}
+          </Text>
+        </View>
+
+        <View className="flex-row justify-end items-center">
           <TouchableOpacity onPress={handleDownloadReport} className="p-2">
             <Ionicons name="download-outline" size={24} color={iconColor} />
           </TouchableOpacity>
@@ -422,8 +448,14 @@ export default function DayWiseReport() {
           data={students}
           ListEmptyComponent={
             <View className="flex-1 justify-center items-center mt-10">
-              <Text className={`text-lg ${colorScheme === "dark" ? "text-gray-300" : "text-gray-600"}`}>
-                {selectedTime === "Select Time" ? "Select a date and time interval" : "No data available"}
+              <Text
+                className={`text-lg ${
+                  colorScheme === "dark" ? "text-gray-300" : "text-gray-600"
+                }`}
+              >
+                {selectedTime === "Select Time"
+                  ? "Select a date and time interval"
+                  : "No data available"}
               </Text>
             </View>
           }
@@ -485,8 +517,8 @@ export default function DayWiseReport() {
                         option.value === selectedStatus
                           ? "#7647EB"
                           : colorScheme === "dark"
-                            ? "#2d3748"
-                            : "#f3f3f3",
+                          ? "#2d3748"
+                          : "#f3f3f3",
                     }}
                     onPress={() => setSelectedStatus(option.value)}
                   >

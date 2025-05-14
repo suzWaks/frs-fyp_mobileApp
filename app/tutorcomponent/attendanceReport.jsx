@@ -329,163 +329,168 @@ export default function AttendanceReport() {
   }
 
   return (
-    <TouchableWithoutFeedback onPress={closeDropdown}>
-      <ScrollView
-        className={`flex-1 p-4 ${colorScheme === "dark" ? "bg-gray-900" : "bg-white"}`}
-      >
-        <View
-          className={`p-4 rounded-lg shadow-md mb-6 ${colorScheme === "dark" ? "bg-gray-800" : "bg-gray-100"}`}
-        >
-          <View className="flex-row items-center justify-between mb-5">
-            <TouchableOpacity onPress={() => setMonthDropdownVisible(false)} className="mr-2">
-              <Text className={`text-lg font-semibold ${colorScheme === "dark" ? "text-gray-400" : "text-black"}`}>
-              Attendance Distribution
-            </Text>
-            </TouchableOpacity>
+    <View className={`flex-1 ${colorScheme === "dark" ? "bg-gray-900" : "bg-white"}`}>
+      {/* Header with title and month dropdown */}
+      <View className={`px-4 pt-4 ${colorScheme === "dark" ? "bg-gray-800" : "bg-white"}`}>
+        <View className="flex-row items-center justify-between">
+          <Text className={`text-lg font-semibold ${colorScheme === "dark" ? "text-gray-400" : "text-black"}`}>
+            Attendance Distribution
+          </Text>
 
-            <View className="relative flex-1">
-              <TouchableOpacity
-                className={`flex-row items-center justify-between border rounded-[10px] p-3 ${
-                  colorScheme === "dark" ? "border-gray-300" : "border-gray-300"
-                }`}
-                onPress={toggleMonthDropdown}
+          <View className="relative flex-1 ml-4">
+            <TouchableOpacity
+              className={`flex-row items-center justify-between border rounded-[10px] p-2 ${
+                colorScheme === "dark" ? "border-gray-300" : "border-gray-300"
+              }`}
+              onPress={toggleMonthDropdown}
+            >
+              <Text
+                style={{ color: colorScheme === "dark" ? "#D1D5DB" : "#000" }}
               >
-                <Text
-                  style={{ color: colorScheme === "dark" ? "#D1D5DB" : "#000" }}
-                >
-                  {monthNames[selectedMonth] || "Select Month"}
-                </Text>
-                <Ionicons
-                  name={monthDropdownVisible ? "chevron-up" : "chevron-down"}
-                  size={16}
-                  color={colorScheme === "dark" ? "#D1D5DB" : "#000"}
-                  className="ml-2"
-                />
-              </TouchableOpacity>
-              {monthDropdownVisible && (
-                <View
-                  className={`absolute top-12 left-0 right-0 border border-gray-200 rounded-[10px] ${
-                    colorScheme === "dark" ? "bg-gray-700" : "bg-white"
-                  } max-h-48 z-10 shadow-md`}
-                >
-                  <FlatList
-                    data={availableMonths}
-                    keyExtractor={(item) => item}
-                    className="rounded-[10px] overflow-hidden"
-                    renderItem={({ item }) => (
-                      <TouchableOpacity
-                        className={`p-3 border-b ${
-                          colorScheme === "dark"
-                            ? "border-gray-500"
-                            : "border-gray-200"
-                        }`}
-                        onPress={() => selectMonth(monthNames.indexOf(item))}
-                      >
-                        <Text
-                          style={{
-                            color: colorScheme === "dark" ? "#D1D5DB" : "#000",
-                          }}
-                        >
-                          {item}
-                        </Text>
-                      </TouchableOpacity>
-                    )}
-                  />
-                </View>
-              )}
-            </View>
-          </View>
-          
-          <View style={{ height: 220, width: '100%', alignItems: 'center' }}>
-            {pieData.length > 0 && (
-              <PieChart
-                data={pieData}
-                width={screenWidth * 0.85}
-                height={200}
-                chartConfig={chartConfig}
-                accessor="population"
-                backgroundColor="transparent"
-                paddingLeft="15"
-                absolute
+                {monthNames[selectedMonth] || "Select Month"}
+              </Text>
+              <Ionicons
+                name={monthDropdownVisible ? "chevron-up" : "chevron-down"}
+                size={16}
+                color={colorScheme === "dark" ? "#D1D5DB" : "#000"}
+                className="ml-2"
               />
+            </TouchableOpacity>
+            {monthDropdownVisible && (
+              <View
+                className={`absolute top-12 left-0 right-0 border border-gray-200 rounded-[10px] ${
+                  colorScheme === "dark" ? "bg-gray-700" : "bg-white"
+                } max-h-48 z-10 shadow-md`}
+              >
+                <FlatList
+                  data={availableMonths}
+                  keyExtractor={(item) => item}
+                  className="rounded-[10px] overflow-hidden"
+                  renderItem={({ item }) => (
+                    <TouchableOpacity
+                      className={`p-3 border-b ${
+                        colorScheme === "dark"
+                          ? "border-gray-500"
+                          : "border-gray-200"
+                      }`}
+                      onPress={() => selectMonth(monthNames.indexOf(item))}
+                    >
+                      <Text
+                        style={{
+                          color: colorScheme === "dark" ? "#D1D5DB" : "#000",
+                        }}
+                      >
+                        {item}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                />
+              </View>
             )}
           </View>
         </View>
+      </View>
 
-        <View className="flex-row justify-between items-center mb-4">
-          <Text className={`text-lg font-semibold ${colorScheme === "dark" ? "text-gray-400" : "text-black"}`}>
-            Monthly Present Percentage
-          </Text>
-        </View>
-
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+      {/* Scrollable content */}
+      <TouchableWithoutFeedback onPress={closeDropdown}>
+        <ScrollView className="flex-1 px-4 py-2">
+          {/* Pie Chart */}
           <View 
-            className={`p-4 rounded-lg shadow-md items-center w-full ${colorScheme === "dark" ? "bg-gray-800" : "bg-gray-100"}`}
+            className={`px-4 rounded-lg shadow-md items-center mb-6 ${colorScheme === "dark" ? "bg-gray-800" : "bg-gray-100"}`}
           >
-            <BarChart
-              data={monthlyData}
-              width={screenWidth * 1.5}
-              height={220}
-              yAxisSuffix="%"
-              chartConfig={chartConfig}
-              showValuesOnTopOfBars
-              fromZero
-              style={{ borderRadius: 16, alignSelf: "center" }}
-            />
+            <View style={{ height: 220, width: '100%', alignItems: 'center' }}>
+              {pieData.length > 0 && (
+                <PieChart
+                  data={pieData}
+                  width={screenWidth * 0.85}
+                  height={200}
+                  chartConfig={chartConfig}
+                  accessor="population"
+                  backgroundColor="transparent"
+                  paddingLeft="15"
+                  absolute
+                />
+              )}
+            </View>
+          </View>
+
+          {/* Monthly Bar Chart */}
+          <View className="flex-row justify-between items-center mb-2">
+            <Text className={`text-lg font-semibold ${colorScheme === "dark" ? "text-gray-400" : "text-black"}`}>
+              Monthly Present Percentage
+            </Text>
+          </View>
+
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            <View 
+              className={`p-4 rounded-lg shadow-md items-center w-full ${colorScheme === "dark" ? "bg-gray-800" : "bg-gray-100"}`}
+            >
+              <BarChart
+                data={monthlyData}
+                width={screenWidth * 1.5}
+                height={220}
+                yAxisSuffix="%"
+                chartConfig={chartConfig}
+                showValuesOnTopOfBars
+                fromZero
+                style={{ borderRadius: 16, alignSelf: "center" }}
+              />
+            </View>
+          </ScrollView>
+
+          <View style={{ flex: 1 }} />
+
+          {/* Detailed Reports */}
+          <View 
+            className={`p-4 rounded-[10px] shadow-md w-full mt-5 ${colorScheme === "dark" ? "bg-gray-800" : "bg-purple-100"}`}
+          >
+            <View className="flex-row items-center justify-between">
+              <Text className={`text-lg font-bold ${colorScheme === "dark" ? "text-gray-400" : "text-black"}`}>Detailed Reports</Text>
+              <TouchableOpacity
+                className="bg-primary rounded-[10px] px-6 py-3"
+                onPress={toggleDropdown}
+              >
+                <Text className="text-white font-bold">View</Text>
+              </TouchableOpacity>
+            </View>
+
+            {allModulesViewOptionsVisible && (
+              <Animated.View
+                className={`absolute top-[-75px] right-2 rounded-[10px] py-2 px-2 w-[150px] shadow-lg ${colorScheme === "dark" ? "bg-gray-700" : "bg-purple-100"}`}
+                style={{
+                  opacity: dropdownOpacity,
+                  transform: [{ translateY: dropdownTranslateY }],
+                }}
+              >
+                <TouchableOpacity
+                  className={`px-2 py-2 rounded-[10px] mb-1 ${colorScheme === "dark" ? "bg-gray-700" : "bg-purple-100"}`}
+                  onPress={() => {
+                    router.push({
+                      pathname: "/tutorcomponent/dayWise",
+                      params: { class_Id: class_Id }
+                    });
+                    closeDropdown();
+                  }}
+                >
+                  <Text className="text-black text-center">Daily Report</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  className={`px-4 py-2 rounded-[10px] ${colorScheme === "dark" ? "bg-gray-700" : "bg-purple-100"}`}
+                  onPress={() => {
+                    router.push({
+                      pathname: "/tutorcomponent/monthWise",
+                      params: { class_Id: class_Id }
+                    });
+                    closeDropdown();
+                  }}
+                >
+                  <Text className="text-black text-center">Monthly Report</Text>
+                </TouchableOpacity>
+              </Animated.View>
+            )}
           </View>
         </ScrollView>
-
-        <View style={{ flex: 1 }} />
-
-        <View 
-          className={`p-4 rounded-[10px] shadow-md w-full mt-5 ${colorScheme === "dark" ? "bg-gray-800" : "bg-purple-100"}`}
-        >
-          <View className="flex-row items-center justify-between">
-            <Text className={`text-lg font-bold ${colorScheme === "dark" ? "text-gray-400" : "text-black"}`}>Detailed Reports</Text>
-            <TouchableOpacity
-              className="bg-primary rounded-[10px] px-6 py-3"
-              onPress={toggleDropdown}
-            >
-              <Text className="text-white font-bold">View</Text>
-            </TouchableOpacity>
-          </View>
-
-          {allModulesViewOptionsVisible && (
-            <Animated.View
-              className={`absolute top-[-75px] right-2 rounded-[10px] py-2 px-2 w-[150px] shadow-lg ${colorScheme === "dark" ? "bg-gray-700" : "bg-purple-100"}`}
-              style={{
-                opacity: dropdownOpacity,
-                transform: [{ translateY: dropdownTranslateY }],
-              }}
-            >
-              <TouchableOpacity
-                className={`px-2 py-2 rounded-[10px] mb-1 ${colorScheme === "dark" ? "bg-gray-700" : "bg-purple-100"}`}
-                onPress={() => {
-                  router.push({
-                    pathname: "/tutorcomponent/dayWise",
-                    params: { class_Id: class_Id }
-                  });
-                  closeDropdown();
-                }}
-              >
-                <Text className="text-black text-center">Daily Report</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                className={`px-4 py-2 rounded-[10px] ${colorScheme === "dark" ? "bg-gray-700" : "bg-purple-100"}`}
-                onPress={() => {
-                  router.push({
-                    pathname: "/tutorcomponent/monthWise",
-                    params: { class_Id: class_Id }
-                  });
-                  closeDropdown();
-                }}
-              >
-                <Text className="text-black text-center">Monthly Report</Text>
-              </TouchableOpacity>
-            </Animated.View>
-          )}
-        </View>
-      </ScrollView>
-    </TouchableWithoutFeedback>
+      </TouchableWithoutFeedback>
+    </View>
   );
 }
