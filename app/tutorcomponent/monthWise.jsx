@@ -318,7 +318,7 @@ export default function MonthWiseReport() {
                 <TouchableOpacity
                   onPress={() =>
                     router.push({
-                      pathname: "/modules/IndividualReportScreen",
+                      pathname: "/tutorcomponent/IndividualReportTutor",
                       params: {
                         studentId: item.id,
                         class_Id: class_Id,

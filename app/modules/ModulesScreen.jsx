@@ -5,9 +5,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useColorScheme } from 'nativewind';
 import { Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import Constants from 'expo-constants';
+import Constants from "expo-constants";
 
-  const API_BASE_URL = Constants.expoConfig.extra.API_BASE_URL;
+const API_BASE_URL = Constants.expoConfig.extra.API_BASE_URL;
 
 export default function ModulesScreen() {
   const params = useLocalSearchParams();
@@ -46,13 +46,14 @@ export default function ModulesScreen() {
         if (user.role.toLowerCase() === 'student') {
           // Use this endpoint for students:
           // GET /api/Students/{studentId}/classes
-          endpoint = `${API_BASE_URL}/api/Students/${studentId}/classes`;
+          endpoint = `${API_BASE_URL}/Students/${studentId}/classes`;
         } else {
           // DAA or HoD - keep existing behavior unchanged
-          endpoint = `${API_BASE_URL}/api/Classes/department/${encodeURIComponent(departmentId)}${year ? `?yearLevel=${year}` : ''}`;
+          endpoint = `${API_BASE_URL}/Classes/department/${encodeURIComponent(departmentId)}${year ? `?yearLevel=${year}` : ''}`;
         }
 
         const response = await fetch(endpoint);
+        console.log('API Response:', response);
         if (!response.ok) {
           const errorText = await response.text();
           console.error('API Error:', errorText);
@@ -141,7 +142,7 @@ export default function ModulesScreen() {
             code: item.code,
             name: item.name,
             instructor: item.instructor,
-            classId: item.class_Id
+            classId: item.class_Id  // class_Id is being passed here
           }
         });
       } else if (role.toLowerCase() === 'student') {

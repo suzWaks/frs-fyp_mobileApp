@@ -48,21 +48,8 @@ export default function TutorLayout() {
           ),
         }}
       />
-      {/* <Tabs.Screen
-        name="modules"
-        options={{
-          title: "Modules",
-          tabBarIcon: ({ color, size, focused }) => (
-            <Ionicons 
-              name={focused ? "library" : "library-outline"} 
-              size={size} 
-              color={focused ? activeColor : color} 
-            />
-          ),
-        }}
-      /> */}
       <Tabs.Screen
-        name="menu"
+        name="Menu"
         options={{
           title: "Menu",
           tabBarIcon: ({ color, size, focused }) => (

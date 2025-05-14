@@ -5,28 +5,75 @@ import {
   StyleSheet, 
   FlatList, 
   Image,
-  Dimensions
+  Dimensions,
+  ActivityIndicator,
+  Platform,
+  Alert
 } from 'react-native';
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useColorScheme } from 'nativewind';
+import * as FileSystem from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
+import * as WebBrowser from 'expo-web-browser';
+import Constants from "expo-constants";
+
+const API_BASE_URL = Constants.expoConfig.extra.API_BASE_URL;
 
 const { width } = Dimensions.get('window');
 const isSmallScreen = width < 375;
 
-const students = [
-  { id: '1', name: 'Suzal Wakhlrey', status: 'Present', image: 'https://via.placeholder.com/40' },
-  { id: '2', name: 'Nima Yozer', status: 'Absent', image: 'https://via.placeholder.com/40' },
-  { id: '3', name: 'Dechen Pelden', status: 'Leave', image: 'https://via.placeholder.com/40' },
-  { id: '4', name: 'Sonam Tenzin', status: 'Leave', image: 'https://via.placeholder.com/40' },
-];
-
+// Remove the static students array since we'll fetch it from API
 export default function AttendanceDetailScreen() {
-  const { date, time } = useLocalSearchParams();
+  const { date, time, classId, attendanceId } = useLocalSearchParams();
+  const [students, setStudents] = useState([]);
+  const [loading, setLoading] = useState(true);
   const router = useRouter();
   const { colorScheme, setColorScheme } = useColorScheme();
   const isDarkMode = colorScheme === 'dark';
+
+  useEffect(() => {
+    const fetchAttendanceDetails = async () => {
+      try {
+        console.log('Fetching attendance details for class:', classId);
+        const response = await fetch(`${API_BASE_URL}/AttendanceRecords/class/${classId}`);
+        if (!response.ok) {
+          throw new Error('Failed to fetch attendance details');
+        }
+        const data = await response.json();
+        console.log('Received data:', data);
+        
+        if (!data || !Array.isArray(data) || data.length === 0) {
+          console.error('Invalid data format received:', data);
+          setStudents([]);
+          return;
+        }
+
+        // Get the first attendance record since we're looking at a specific date/time
+        const attendanceRecord = data[0];
+        
+        // Map the students array from the attendance record
+        const formattedStudents = attendanceRecord.students.map(student => ({
+          id: student.studentId,
+          name: student.name,
+          email: student.email,
+          status: student.status === 0 ? 'Present' : student.status === 1 ? 'Absent' : 'Leave',
+          image: 'https://via.placeholder.com/40'
+        }));
+        setStudents(formattedStudents);
+      } catch (error) {
+        console.error('Error fetching attendance details:', error);
+        setStudents([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (classId) {
+      fetchAttendanceDetails();
+    }
+  }, [classId]);
 
   // Primary color and its variations
   const PRIMARY_COLOR = '#7647EB';
@@ -50,6 +97,56 @@ export default function AttendanceDetailScreen() {
   const headerBg = isDarkMode ? '#1E1E1E' : '#F5F5F5';
   const cardBg = isDarkMode ? '#1E1E1E' : '#fff';
   const borderColor = isDarkMode ? '#3b3b3b' : '#e5e5e5';
+
+  const handleDownloadReport = async () => {
+    if (students.length === 0) {
+      Alert.alert('No Data', 'There is no data to download');
+      return;
+    }
+
+    const csvContent = [
+      ["Student ID", "Name", "Email", "Status"],
+      ...students.map(({ id, name, email, status }) => [
+        id,
+        name,
+        email,
+        status
+      ]),
+    ]
+      .map((row) => row.join(","))
+      .join("\n");
+
+    if (Platform.OS === "web") {
+      const blob = new Blob([csvContent], { type: "text/csv" });
+      const url = URL.createObjectURL(blob);
+      WebBrowser.openBrowserAsync(url);
+      return;
+    }
+
+    const fileUri = FileSystem.documentDirectory + `Attendance_Report_${date.replace(/\//g, "-")}_${time.replace(/[: ]/g, "-")}.csv`;
+
+    try {
+      await FileSystem.writeAsStringAsync(fileUri, csvContent, {
+        encoding: FileSystem.EncodingType.UTF8,
+      });
+
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(fileUri, {
+          dialogTitle: "Download Attendance Report",
+          mimeType: "text/csv",
+          UTI: "public.comma-separated-values-text",
+        });
+      } else {
+        Alert.alert(
+          "Report Saved",
+          "The report has been saved to your device storage"
+        );
+      }
+    } catch (error) {
+      Alert.alert("Error", "Could not save the file");
+      console.error(error);
+    }
+  };
 
   return (
     <View style={[styles.container, { backgroundColor }]}>
@@ -100,85 +197,82 @@ export default function AttendanceDetailScreen() {
       </View>
 
       {/* Students List */}
-      <FlatList
-        data={students}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <TouchableOpacity
-            onPress={() => router.push(`/modules/IndividualReportScreen?name=${item.name}&id=${item.id}&image=${item.image}`)}
-          >
-            <View style={[styles.studentCard, { 
-              backgroundColor: cardBg,
-              borderBottomColor: borderColor 
-            }]}>
-              <Image source={{ uri: item.image }} style={styles.studentImage} />
-              <View style={styles.studentInfo}>
-                <Text style={[styles.studentName, { 
-                  color: textColor,
-                  fontSize: responsiveFontSize(16)
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={PRIMARY_COLOR} />
+        </View>
+      ) : (
+        <>
+          <FlatList
+            data={students}
+            keyExtractor={(item) => item.id.toString()}
+            renderItem={({ item }) => (
+              <TouchableOpacity
+                onPress={() => router.push(`/modules/IndividualReportScreen?class_Id=${classId}&studentId=${item.id}&name=${item.name}`)}
+              >
+                <View style={[styles.studentCard, { 
+                  backgroundColor: cardBg,
+                  borderBottomColor: borderColor 
                 }]}>
-                  {item.name}
-                </Text>
-                <Text style={[styles.studentDetails, { 
-                  color: isDarkMode ? '#E2E2E280' : '#888',
-                  fontSize: responsiveFontSize(14)
-                }]}>
-                  0210228, 4IT
-                </Text>
-              </View>
-              <Text style={[
-                styles.studentStatus, 
-                styles[item.status.toLowerCase()],
-                { 
-                  backgroundColor: isDarkMode ? 
-                    (item.status === 'Present' ? '#155724' : 
-                     item.status === 'Absent' ? '#721C24' : '#856404') : 
-                    (item.status === 'Present' ? '#D4EDDA' : 
-                     item.status === 'Absent' ? '#F8D7DA' : '#FFF3CD'),
-                  color: isDarkMode ? '#fff' : 
-                    (item.status === 'Present' ? '#155724' : 
-                     item.status === 'Absent' ? '#721C24' : '#856404'),
-                  fontSize: responsiveFontSize(14)
-                }
-              ]}>
-                {item.status}
-              </Text>
-            </View>
-          </TouchableOpacity>
-        )}
-      />
+                  <Image source={{ uri: item.image }} style={styles.studentImage} />
+                  <View style={styles.studentInfo}>
+                    <Text style={[styles.studentName, { 
+                      color: textColor,
+                      fontSize: responsiveFontSize(16)
+                    }]}>
+                      {item.name}
+                    </Text>
+                    <Text style={[styles.studentDetails, { 
+                      color: isDarkMode ? '#E2E2E280' : '#888',
+                      fontSize: responsiveFontSize(14)
+                    }]}>
+                      0210228, 4IT
+                    </Text>
+                  </View>
+                  <Text style={[
+                    styles.studentStatus, 
+                    styles[item.status.toLowerCase()],
+                    { 
+                      backgroundColor: isDarkMode ? 
+                        (item.status === 'Present' ? '#155724' : 
+                         item.status === 'Absent' ? '#721C24' : '#856404') : 
+                        (item.status === 'Present' ? '#D4EDDA' : 
+                         item.status === 'Absent' ? '#F8D7DA' : '#FFF3CD'),
+                      color: isDarkMode ? '#fff' : 
+                        (item.status === 'Present' ? '#155724' : 
+                         item.status === 'Absent' ? '#721C24' : '#856404'),
+                      fontSize: responsiveFontSize(14)
+                    }
+                  ]}>
+                    {item.status}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            )}
+          />
 
-      {/* Actions - Using primary color */}
-      <View style={styles.actions}>
-        <TouchableOpacity 
-          style={[styles.editButton, { 
-            backgroundColor: PRIMARY_COLOR,
-            shadowColor: '#000',
-            shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: 0.2,
-            shadowRadius: 4,
-            elevation: 3,
-          }]}
-        >
-          <Text style={styles.editButtonText}>Edit</Text>
-        </TouchableOpacity>
-        <TouchableOpacity 
-          style={[styles.downloadButton, { 
-            borderColor: PRIMARY_COLOR,
-            shadowColor: '#000',
-            shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: 0.2,
-            shadowRadius: 4,
-            elevation: 3,
-          }]}
-        >
-          <Text style={[styles.downloadButtonText, { 
-            color: PRIMARY_COLOR,
-          }]}>
-            Download Report
-          </Text>
-        </TouchableOpacity>
-      </View>
+          <View style={styles.actions}>
+            <TouchableOpacity 
+              style={[styles.downloadButton, { 
+                borderColor: PRIMARY_COLOR,
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.2,
+                shadowRadius: 4,
+                elevation: 3,
+                flex: 1
+              }]}
+              onPress={handleDownloadReport}
+            >
+              <Text style={[styles.downloadButtonText, { 
+                color: PRIMARY_COLOR,
+              }]}>
+                Download Report
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </>
+      )}
     </View>
   );
 }
@@ -268,27 +362,29 @@ const styles = StyleSheet.create({
     margin: 15,
     marginTop: 20,
   },
-  editButton: {
-    padding: 15,
-    borderRadius: 10,
-    alignItems: 'center',
-    flex: 1,
-    marginRight: 10,
-  },
-  editButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '500',
-  },
   downloadButton: {
     padding: 15,
     borderRadius: 10,
     alignItems: 'center',
-    flex: 1,
     borderWidth: 1,
   },
   downloadButtonText: {
     fontSize: 16,
     fontWeight: '500',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  emptyText: {
+    fontSize: 16,
+    textAlign: 'center',
   },
 });

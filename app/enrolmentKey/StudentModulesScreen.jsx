@@ -62,7 +62,7 @@ export default function StudentModulesScreen() {
         }
 
         // Use the same endpoint as ModulesScreen with the correct departmentId
-        const endpoint = `${API_BASE_URL}/api/Classes/department/${encodeURIComponent(departmentIdToUse)}${year ? `?yearLevel=${year}` : ''}`;
+        const endpoint = `${API_BASE_URL}/Classes/department/${encodeURIComponent(departmentIdToUse)}${year ? `?yearLevel=${year}` : ''}`;
         console.log('Fetching from:', endpoint);
 
         const response = await fetch(endpoint);

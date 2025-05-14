@@ -8,8 +8,8 @@
     "scheme": "myapp",
     "userInterfaceStyle": "automatic",
     "extra":{
-      "API_BASE_URL": "http://10.2.23.120:5253/api",
-      "API_MODEL_URL": "http://10.2.23.120:5000"
+      "API_BASE_URL": "http://10.2.5.115:5253/api",
+      "API_MODEL_URL": "http://10.2.5.115:5000"
     },
     "newArchEnabled": true,
     "ios": {

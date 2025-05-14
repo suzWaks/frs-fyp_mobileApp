@@ -4,8 +4,9 @@ import { useColorScheme } from "nativewind";
 import Svg, { Circle } from "react-native-svg";
 import { Dimensions } from "react-native";
 import { Ionicons } from '@expo/vector-icons';
-import Constants from "expo-constants";
+
 import { useLocalSearchParams, useRouter } from "expo-router";
+import Constants from "expo-constants";
 
 const API_BASE_URL = Constants.expoConfig.extra.API_BASE_URL;
 const screenWidth = Dimensions.get("window").width;

@@ -58,11 +58,7 @@ const calculateHours = (timeInterval) => {
 
 export default function IndividualReport() {
   const { colorScheme } = useColorScheme();
-  const params = useLocalSearchParams();
-  const class_Id = params.class_Id;
-  const studentId = params.studentId;
-  const name = params.name;
-
+  const { class_Id, studentId, name } = useLocalSearchParams();
   const [attendanceRecords, setAttendanceRecords] = useState([]);
   const [loading, setLoading] = useState(true);
   const [studentInfo] = useState({
@@ -77,9 +73,10 @@ export default function IndividualReport() {
     const fetchData = async () => {
       try {
         setLoading(true);
-        const endpoint = `${API_BASE_URL}/Students/${studentId}/attendance`;
 
-        const response = await fetch(endpoint);
+        const response = await fetch(
+          `${API_BASE_URL}/Students/${studentId}/attendance`
+        );
         if (!response.ok) throw new Error("Attendance fetch failed");
         const data = await response.json();
 
@@ -204,19 +201,11 @@ export default function IndividualReport() {
         </Text>
       </View>
       {/* Student Profile Section */}
-      <View className="mb-4">
-        <View className="flex-row items-center space-x-2 mb-2">
-          <Ionicons name="person-sharp" size={20} color={iconColor} />
-          <Text style={{ color: colorScheme === "dark" ? "#D1D5DB" : "#555", fontWeight: "bold", fontSize: 16 }}>
-            {studentInfo.name}
-          </Text>
-        </View>
-        <View className="flex-row items-center space-x-2">
-          <Ionicons name="card-sharp" size={20} color={iconColor} />
-          <Text style={{ color: colorScheme === "dark" ? "#D1D5DB" : "#555" }}>
-            Student ID: {studentInfo.student_Id}
-          </Text>
-        </View>
+      <View className="mb-4 flex-row items-center space-x-2">
+        <Ionicons name="person-sharp" size={20} color={iconColor} />
+        <Text style={{ color: colorScheme === "dark" ? "#D1D5DB" : "#555" }}>
+          Student ID: {studentInfo.student_Id}
+        </Text>
       </View>
 
       {/* Attendance Summary Card */}
