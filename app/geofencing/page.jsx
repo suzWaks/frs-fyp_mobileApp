@@ -22,7 +22,7 @@ const API_BASE_URL = Constants.expoConfig.extra.API_BASE_URL;
 
 const API_ENDPOINT = 'https://your-backend.com/api/attendance';
 const LOCATIONS_API = `${API_BASE_URL}/Locations`;
-const DEFAULT_RADIUS = 50;
+const DEFAULT_RADIUS = 10;
 
 export default function AttendanceScreen() {
   const [loading, setLoading] = useState(false);

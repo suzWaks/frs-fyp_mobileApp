@@ -413,12 +413,12 @@ const ModuleReport = () => {
             styles.applyLeaveButton,
             activeButton === 'applyLeave' && styles.buttonPressed,
           ]}
-          // onPress={() => {
-          //   router.push('/geofencing/page');
-          // }}
           onPress={() => {
-            router.push('/geofencing/stdFence');
+            router.push('/geofencing/page');
           }}
+          // onPress={() => {
+          //   router.push('/geofencing/stdFence');
+          // }}
         >
           <Text
             style={[

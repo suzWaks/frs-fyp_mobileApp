@@ -1,50 +1,78 @@
-# Welcome to your Expo app 👋
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+# frs-fyp_mobileApp 📱
 
-## Get started
+This repository contains the mobile application frontend of the CST Attendance Management System using Facial Recognition — built using Expo and React Native.
 
-1. Install dependencies
+## Overview
 
+The `frs-fyp_mobileApp` is the mobile application that allows students to mark attendance using facial recognition and geofencing, and allows tutors and admins to manage attendance sessions in real-time.
+
+## Features
+
+- Attendance marking using facial recognition
+- Real-time tracking of active sessions via SignalR
+- Attendance history and reporting
+- Role-based navigation (Student, Tutor, Admin, DAA, PL)
+- Integration with backend REST APIs
+
+## Technologies Used
+
+- **Framework**: React Native (via Expo)
+- **Language**: TypeScript
+- **Routing**: Expo Router
+- **Real-time**: SignalR Client
+- **Styling**: TailwindCSS and Native wind
+
+
+## Installation
+Skip step 1 if you are using .zip file
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/suzWaks/frs-fyp_mobileApp.git
+   ```
+
+2. Navigate to the project directory:
+   ```bash
+   cd frs-fyp_mobileApp
+   ```
+
+3. Get your ip address and change it in `app.json`:
+   ```bash
+      "API_BASE_URL": "http://{your_ip}:5253/api",
+      "API_MODEL_URL": "http://{your_ip}:5000"
+   ```
+
+4. Install dependencies:
    ```bash
    npm install
    ```
 
-2. Start the app
+## Usage
 
-   ```bash
-    npx expo start
-   ```
+### Run Face Recognition Model
 
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+Before starting the mobile app, run the face recognition server:
 
 ```bash
-npm run reset-project
+cd assets/model
+python app.py
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+This will start the Python-based ML server that performs facial recognition.
 
-## Learn more
+### Run the Mobile App
 
-To learn more about developing your project with Expo, look at the following resources:
+1. Start the app:
+   ```bash
+   npx expo start
+   ```
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+2. From the output, you can open the app using:
+   - **Expo Go** on your mobile device
+   - **Android Emulator** or **iOS Simulator**
 
-## Join the community
+## Contact
 
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+- **Name**: Suzal Wakhley
+- **Email**: suzalwakhley@gmail.com
+- **GitHub**: [suzWaks](https://github.com/suzWaks)

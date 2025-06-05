@@ -1,3 +1,5 @@
+//stdFence.jsx
+
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -20,9 +22,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 
 const API_BASE_URL = Constants.expoConfig.extra.API_BASE_URL;
 const LOCATIONS_API = `${API_BASE_URL}/Locations`;
-const DEFAULT_RADIUS = 50;
-
-
+const DEFAULT_RADIUS = 10;
 
 export default function MarkAttendanceScreen() {
   const [loading, setLoading] = useState(false);

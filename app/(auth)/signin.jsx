@@ -178,6 +178,7 @@ export default function SignInScreen() {
       const studentList = await studentResponse.json();
       const student = studentList.find(student => student.email.toLowerCase() === trimmedEmail);
 
+
       if (student) {
         const userInfo = {
           id: student.id,
@@ -189,9 +190,9 @@ export default function SignInScreen() {
           departmentName: student.department?.department_Name || 'Department Not Assigned',
           phoneNo: student.phone_No,
           profilePicture: student.profile_PictureURL,
-          moduleIds: student.moduleIds || [],
+          moduleIds: student.classes?.map(cls => cls.class_Id) || [],
           hasFaceData: !!student.faceData && !!student.faceData.faceEmbedding
-        };
+        };        
 
         await handleUserLoginSuccess(userInfo);
       } else {

@@ -1,4 +1,4 @@
-//RealTimeRecord.jsx
+// RealTimeRecord.jsx
 import React, { useState, useEffect, useRef } from "react";
 import * as signalR from '@microsoft/signalr';
 import { 
@@ -32,12 +32,15 @@ const RealTimeRecord = () => {
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [marked, setMarked] = useState({});
+  const [realTimeMarked, setRealTimeMarked] = useState({});
   const timerRef = useRef(null);
   const [classDetails, setClassDetails] = useState(null);
   const [connection, setConnection] = useState(null);
-  const [realTimeMarked, setRealTimeMarked] = useState({});
 
-useEffect(() => {
+  // Combine both local and real-time mark status
+  const combinedMarked = { ...marked, ...realTimeMarked };
+
+  useEffect(() => {
     if (!attendanceSession?.attendanceId) return;
 
     const newConnection = new signalR.HubConnectionBuilder()
@@ -47,6 +50,7 @@ useEffect(() => {
 
     // Handle initial attendance status
     newConnection.on("InitialAttendanceStatus", (initialStatus) => {
+      console.log("Received initial status:", initialStatus);
       const initialStatusMap = initialStatus.reduce((acc, status) => {
         acc[status.studentId] = status.status;
         return acc;
@@ -56,6 +60,7 @@ useEffect(() => {
 
     // Handle real-time updates
     newConnection.on("StudentAttendanceUpdated", (update) => {
+      console.log("Received attendance update:", update);
       setRealTimeMarked(prev => ({
         ...prev,
         [update.studentId]: update.status
@@ -70,6 +75,7 @@ useEffect(() => {
     // Start connection and join attendance session group
     newConnection.start()
       .then(() => {
+        console.log("SignalR connection established");
         newConnection.invoke("JoinAttendanceSession", attendanceSession.attendanceId);
         setConnection(newConnection);
       })
@@ -80,8 +86,10 @@ useEffect(() => {
     // Cleanup on unmount
     return () => {
       if (newConnection) {
-        newConnection.invoke("LeaveAttendanceSession", attendanceSession.attendanceId);
-        newConnection.stop();
+        newConnection.invoke("LeaveAttendanceSession", attendanceSession.attendanceId)
+          .catch(err => console.error("Error leaving session:", err));
+        newConnection.stop()
+          .catch(err => console.error("Error stopping connection:", err));
       }
     };
   }, [attendanceSession?.attendanceId]);
@@ -193,7 +201,10 @@ useEffect(() => {
 
   // Mark a student as present
   const markStudent = async (studentId, status = "Present") => {
-    if (!connection) return;
+    if (!connection) {
+      Alert.alert("Connection Error", "Not connected to attendance server.");
+      return;
+    }
 
     try {
       // Local optimistic update
@@ -208,6 +219,8 @@ useEffect(() => {
         studentId, 
         status
       );
+      
+      console.log(`Marked student ${studentId} as ${status}`);
     } catch (error) {
       console.error("Error marking student:", error);
       // Revert local state on failure
@@ -216,12 +229,11 @@ useEffect(() => {
         delete newState[studentId];
         return newState;
       });
+      Alert.alert("Error", "Failed to mark attendance. Please try again.");
     }
   };
 
-  const combinedMarked = { ...marked, ...realTimeMarked };
-
-const handleSessionEnd = async () => {
+  const handleSessionEnd = async () => {
     // Update attendance to set isActive to false
     try {
       const response = await fetch(`${API_BASE_URL}/AttendanceRecords/flag/${attendanceSession.attendanceId}`, {
@@ -293,29 +305,29 @@ const handleSessionEnd = async () => {
   };
 
   useEffect(() => {
-  const fetchClassDetails = async () => {
-    if (!attendanceSession?.classId) return;
+    const fetchClassDetails = async () => {
+      if (!attendanceSession?.classId) return;
 
-    try {
-      const response = await fetch(`${API_BASE_URL}/Classes/${attendanceSession.classId}`);
-      if (!response.ok) {
-        throw new Error("Failed to fetch class details");
+      try {
+        const response = await fetch(`${API_BASE_URL}/Classes/${attendanceSession.classId}`);
+        if (!response.ok) {
+          throw new Error("Failed to fetch class details");
+        }
+
+        const data = await response.json();
+        setClassDetails(data);
+      } catch (error) {
+        console.error("Error fetching class details:", error);
       }
+    };
 
-      const data = await response.json();
-      setClassDetails(data);
-    } catch (error) {
-      console.error("Error fetching class details:", error);
-    }
-  };
-
-  fetchClassDetails();
-}, [attendanceSession?.classId]);
-
+    fetchClassDetails();
+  }, [attendanceSession?.classId]);
 
   // Render item for student list
   const renderStudentItem = ({ item }) => {
-    const isMarked = marked[item.student_Id];
+    // Use the combined status from local and real-time tracking
+    const status = combinedMarked[item.student_Id];
     
     return (
       <View className={`flex-row justify-between items-center p-4 border-b ${
@@ -337,7 +349,7 @@ const handleSessionEnd = async () => {
         <View className="flex-row">
           <TouchableOpacity 
             className={`px-3 py-2 rounded-lg mr-2 ${
-              isMarked === "Present" 
+              status === "Present" 
                 ? "bg-green-500" 
                 : colorScheme === "dark" 
                   ? "bg-gray-700" 
@@ -347,13 +359,13 @@ const handleSessionEnd = async () => {
             disabled={timeLeft === 0}
           >
             <FontAwesome5 name="check" size={16} color={
-              isMarked === "Present" ? "white" : "gray"
+              status === "Present" ? "white" : "gray"
             } />
           </TouchableOpacity>
           
           <TouchableOpacity 
             className={`px-3 py-2 rounded-lg ${
-              isMarked === "Absent" 
+              status === "Absent" 
                 ? "bg-red-500" 
                 : colorScheme === "dark" 
                   ? "bg-gray-700" 
@@ -363,7 +375,7 @@ const handleSessionEnd = async () => {
             disabled={timeLeft === 0}
           >
             <FontAwesome5 name="times" size={16} color={
-              isMarked === "Absent" ? "white" : "gray"
+              status === "Absent" ? "white" : "gray"
             } />
           </TouchableOpacity>
         </View>
@@ -411,11 +423,9 @@ const handleSessionEnd = async () => {
               }>
                 {attendanceSession.locationName}
               </Text>
-
             </View>
             <View className="flex-row justify-between items-center mt-2">
-              
-                            <Text className={colorScheme === "dark" ? "text-primary-300" : "text-primary"}>
+              <Text className={colorScheme === "dark" ? "text-primary-300" : "text-primary"}>
                 {classDetails?.module_Code || ""}
               </Text>
               <Text className={
@@ -500,7 +510,7 @@ const handleSessionEnd = async () => {
         <Text className={
           colorScheme === "dark" ? "text-green-400" : "text-green-600"
         }>
-          Marked: {Object.keys(marked).length}
+          Marked: {Object.keys(combinedMarked).length}
         </Text>
       </View>
     </SafeAreaView>
